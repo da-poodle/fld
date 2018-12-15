@@ -4,8 +4,9 @@
               fld_set/3,
               flds/2,
               flds_set/3,
-              generate_fld_obj/2,
-              remove_fld_obj/1]).
+              fld_template/2,
+              fld_generate/2,
+              fld_destroy/1]).
 
 :- dynamic(fld_object/2).
 :- dynamic(fld/2).
@@ -19,8 +20,15 @@ flds_set([F|T], Obj, Newer) :-
     fld_set(F, Obj, New),
     flds_set(T, New, Newer).
 
-remove_fld_obj(Name) :- \+ fld_object(Name, _).
-remove_fld_obj(Name) :-
+fld_template(Name, Template) :-
+    fld_object(Name, Flds),
+
+    length(Flds, Len),
+    obj(Name, Len, Template, _).
+
+fld_destroy(Name) :- \+ fld_object(Name, _).
+fld_destroy(Name) :-
+    atom(Name),
     fld_object(Name, Flds),
 
     length(Flds, Len),
@@ -31,7 +39,7 @@ remove_fld_obj(Name) :-
     retractall(fld_object(Name,Flds)),
     !.
 
-generate_fld_obj(Name, Flds) :-
+fld_generate(Name, Flds) :-
     atom(Name),
     is_list(Flds),
     assert(fld_object(Name, Flds)),
@@ -83,18 +91,4 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
     fld_set_arg(Val, T, Nt, N1).
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
-
-
-% remove me
-listobjs :-
-    listing(fld_object),
-    listing(fld),
-    listing(fld_set).
-
-
-
-
-
-
-
 
