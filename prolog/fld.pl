@@ -28,6 +28,7 @@ SOFTWARE.
               flds/2,
               flds_set/3,
               fld_template/2,
+              fld_fields/2,
               fld_destroy/1]).
 
 :- dynamic(fld_object_def/2).
@@ -119,3 +120,14 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
     fld_set_arg(Val, T, Nt, N1).
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
+
+
+% return a list of all fields as terms instead of atoms
+fld_fields(Obj, Fields) :-
+
+    Obj =.. [Name|Vals],
+    fld_object(Name, Flds),
+
+    maplist(fld_field_object,Flds,Vals,Fields).
+
+fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
