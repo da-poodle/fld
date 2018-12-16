@@ -13,11 +13,11 @@ To install the fld library, type the following in the SWI-Prolog shell:
 
 Usage
 =====
-The library allows the definition of data that will be used in a program. To define a 'type' then use fld_generate/2. 
+The library allows the definition of data that will be used in a program. To define a 'type' then use fld_object/2. 
 
 eg: To create a person object, the following could be added to prolog.
 ```prolog
-:- fld_generate(person, [name, age, gender]).
+:- fld_object(person, [name, age, gender]).
 ```
 fld uses the concept of 'business types' so in this case there are four type:
 1. person
@@ -89,7 +89,7 @@ F = person(_944, _950, _956).
 true.
 ```
 ## fld_destroy/1
-Destroy and fld object so it can no longer be used. Not highly useful as object should be created for the duration of a program, however it is needed for unit testing and maybe specific scenarios.
+Destroy and fld object so it can no longer be used. Not highly useful as objects should be created for the duration of a program, however it is needed for unit testing and maybe specific scenarios.
 ```prolog
 ?- fld(name(N), person(greg, 35, male)).
 N = greg.
@@ -101,3 +101,37 @@ true.
 false.
 ```
 fld_destroy/1 will always succeed.
+
+Examples
+========
+## Example 1 - Reading from CSV files
+A CSV file for bank records needs to be read which has the following headings:
+```csv
+transaction_id,date,description,amount,balance
+```
+The task is to find any transactions that are over $1000
+
+In this case fld can be used to map the incoming data more easily, especially if the number or order of the data changes. 
+```prolog
+% Create an fld_object for the headers
+:- fld_object(transaction, [transaction_id,date,description,amount,balance]).
+
+% Read in the CSV file with the functor name as the fld_object name and arity of 5. This will get a list of data which matches the fld_object(transaction,_).
+read_bank_records(Data) :-
+  csv_read_file('back_records.csv', Data, [functor(transaction), arity(5)]).
+
+% create a filter that can get the records over $1000
+over_one_thousand(Tran) :- fld(amount(Amount), Tran), Amount > 1000.
+
+% load and filter the data
+load_and_filter :-
+    read_bank_records(Data),
+    include(over_one_thousand, Data, ExpensiveRecords),
+    maplist(print_record, ExpensiveRecords).
+
+print_record(Tran) :-
+    flds([date(Date), description(Desc), amount(Amount)], Tran),
+    format('~w ~w ~w~n', [Date, Amount, Desc]).
+```
+
+
