@@ -1,3 +1,26 @@
+/*
+MIT License
+
+Copyright (c) 2018 Neil Hoskins
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 :- module(fld, [
               fld_object/2,
               fld/2,
@@ -30,7 +53,7 @@ fld_object(Name, Flds) :-
     atom(Name),
     is_list(Flds),
 
-    % create the object if it doesn't already exist
+    % create the object only if it doesn't already exist
     \+ fld_object(Name, _),
     assert(fld_object_def(Name, Flds)),
 
@@ -96,7 +119,3 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
     fld_set_arg(Val, T, Nt, N1).
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
-
-
-
-

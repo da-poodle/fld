@@ -1,7 +1,7 @@
 FLD 
 ===
 
-A library for accessing and updating term arguments in Prolog.
+A library for accessing and updating term arguments in Prolog in a position independent way. 
 
 Installation
 ============
@@ -19,17 +19,23 @@ eg: To create a person object, the following could be added to prolog.
 ```prolog
 :- fld_object(person, [name, age, gender]).
 ```
-fld uses the concept of 'business types' so in this case there are four type:
+fld uses the concept of 'business types' so in this case there are four types:
 1. person
 1. name
 1. age
 1. gender 
 
-a person is a composite type that contains the other three. 
+a person is a composite type that contains the other three. The names represent a specific type of data and 
+should be used consistently throughout a program. Name for example might not only relate to people, but the validation etc.. should be the same for all types that use it.
 
-This will define all the predicates that are required for fld to operate. 
+Note that this is similar to library(record) except that specific names are not used for each object type. There are
+a few reasons for this: 
+* Specific names are hard to remember and hard to read
+* Multiple types may share fields with the same names. if they do then predicates can be written to handle multiple types. 
+* Validation can then be done at a type level rather than an object level which brings consistency in large programs. 
 
-Predicate Reference
+
+API Reference
 ===================
 ## fld_object/2
 Define a term and the named fields that can be used with the fld library.
@@ -76,7 +82,7 @@ Replace several term arguments by name.
 P = person(frank,25,male).
 ```
 ## fld_template/2
-This predicate two uses.
+This predicate has two uses.
 
 *Use 1:* generate a blank version of a term by name:
 ```prolog
@@ -111,14 +117,19 @@ transaction_id,date,description,amount,balance
 ```
 The task is to find any transactions that are over $1000
 
-In this case fld can be used to map the incoming data more easily, especially if the number or order of the data changes. 
+In this case fld can be used to map the incoming data more easily, 
+especially if the number or order of the data changes. 
 ```prolog
-% Create an fld_object for the headers
-:- fld_object(transaction, [transaction_id,date,description,amount,balance]).
+:- use_module(library(fld)).
 
-% Read in the CSV file with the functor name as the fld_object name and arity of 5. This will get a list of data which matches the fld_object(transaction,_).
+% Create an fld_object for the headers
+:- fld_object(transaction, [transaction_id, date, description, amount, balance]).
+
+% Read in the CSV file with the functor name as the fld_object name and arity of 5.
+% This will get a list of data which matches the
+% fld_object(transaction,_).
 read_bank_records(Data) :-
-  csv_read_file('back_records.csv', Data, [functor(transaction), arity(5)]).
+  csv_read_file('bank_records.csv', Data, [functor(transaction), arity(5)]).
 
 % create a filter that can get the records over $1000
 over_one_thousand(Tran) :- fld(amount(Amount), Tran), Amount > 1000.
@@ -131,7 +142,31 @@ load_and_filter :-
 
 print_record(Tran) :-
     flds([date(Date), description(Desc), amount(Amount)], Tran),
-    format('~w ~w ~w~n', [Date, Amount, Desc]).
+    format('~w $~w - ~w~n', [Date, Amount, Desc]).
 ```
 
+## Example 2 - Using multiple types in the same code
+It is possible to use multiple object types in the same code if they share fields.
+```prolog
+:- use_module(library(fld)).
 
+:- fld_object(car, [owner, model, registration, expires, year_of_make, body_type]).
+:- fld_object(bus, [company, model, registration, expires, year_of_make]).
+
+registration_valid(RoadUser) :-
+  flds([registration(Rego), expires(Expires)], RoadUser),
+  get_time(Time),
+  (   Time < Expires -> true
+  ; format('Rego ~p is expired~n', Rego)).
+
+
+test :-
+    fld_template(car, C),
+    flds_set([registration('ABC-123'), expires(1544947900.570324)], C, C1),
+    registration_valid(C1).
+
+test :-
+    fld_template(bus, B),
+    flds_set([registration('DA-BUS01'), expires(1544947900.570324)], B, B1),
+    registration_valid(B1).
+```
