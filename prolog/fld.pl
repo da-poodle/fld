@@ -5,10 +5,9 @@
               flds/2,
               flds_set/3,
               fld_template/2,
-              fld_generate/2,
               fld_destroy/1]).
 
-:- dynamic(fld_object/2).
+:- dynamic(fld_object_def/2).
 :- dynamic(fld/2).
 :- dynamic(fld_set/3).
 
@@ -21,10 +20,24 @@ flds_set([F|T], Obj, Newer) :-
     flds_set(T, New, Newer).
 
 fld_template(Name, Template) :-
-    fld_object(Name, Flds),
+    fld_object_def(Name, Flds),
 
     length(Flds, Len),
     obj(Name, Len, Template, _).
+
+fld_object(Name, Flds) :- fld_object_def(Name, Flds), !.
+fld_object(Name, Flds) :-
+    atom(Name),
+    is_list(Flds),
+
+    % create the object if it doesn't already exist
+    \+ fld_object(Name, _),
+    assert(fld_object_def(Name, Flds)),
+
+    length(Flds, Len),
+    generate_flds(Flds, Name, Len, 0),
+    !.
+
 
 fld_destroy(Name) :- \+ fld_object(Name, _).
 fld_destroy(Name) :-
@@ -39,14 +52,6 @@ fld_destroy(Name) :-
     retractall(fld_object(Name,Flds)),
     !.
 
-fld_generate(Name, Flds) :-
-    atom(Name),
-    is_list(Flds),
-    assert(fld_object(Name, Flds)),
-
-    length(Flds, Len),
-    generate_flds(Flds, Name, Len, 0),
-    !.
 
 generate_flds([], _, _, _).
 generate_flds([F|T], Name, Len, N) :-
@@ -91,4 +96,7 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
     fld_set_arg(Val, T, Nt, N1).
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
+
+
+
 
