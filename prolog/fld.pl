@@ -1,4 +1,5 @@
-/*
+/** fld
+
 MIT License
 
 Copyright (c) 2018 Neil Hoskins
@@ -20,6 +21,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+@author Neil Hoskins
+@licence MIT
 */
 :- module(fld, [
               fld_object/2,
@@ -32,23 +36,38 @@ SOFTWARE.
               fld_destroy/1]).
 
 :- dynamic(fld_object_def/2).
+
+%! fld(?Field:term, ?Object:term) is det.
+% Field is a argument in an object.
 :- dynamic(fld/2).
+
+%! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
+% New is the old term with field updated.
 :- dynamic(fld_set/3).
 
+%! flds(?Fields:list, ?Object:term) is nondet.
+% Fields are a list of values that all exist in object.
 flds([], _).
 flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
 
+%! flds_set(?Fields:list, ?Old:term, ?New:term) is nondet.
+% new is the old term with all of fields updated.
 flds_set([], O, O).
 flds_set([F|T], Obj, Newer) :-
     fld_set(F, Obj, New),
     flds_set(T, New, Newer).
 
+%! fld_template(?Name:atom, ?Template:list) is nondet.
+% template is an object with all fields as uninstaniated variables.
 fld_template(Name, Template) :-
     fld_object_def(Name, Flds),
 
     length(Flds, Len),
     obj(Name, Len, Template, _).
 
+%! fld_object(++Name:atom, ++Fields:list) is det.
+% fields is a list of all fields that relate to object of name.
+% if the name does not exist then it is created.
 fld_object(Name, Flds) :- fld_object_def(Name, Flds), !.
 fld_object(Name, Flds) :-
     atom(Name),
@@ -63,6 +82,8 @@ fld_object(Name, Flds) :-
     !.
 
 
+%!  fld_destroy(++Name:atom) is det.
+% The fld_object that relates to name is no longer usable.
 fld_destroy(Name) :- \+ fld_object(Name, _).
 fld_destroy(Name) :-
     atom(Name),
@@ -121,8 +142,8 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
-
-% return a list of all fields as terms instead of atoms
+%! fld_feilds(?Object:term, ?Fields:list) is semidet.
+% return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
 
     Obj =.. [Name|Vals],
@@ -131,3 +152,18 @@ fld_fields(Obj, Fields) :-
     maplist(fld_field_object,Flds,Vals,Fields).
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
