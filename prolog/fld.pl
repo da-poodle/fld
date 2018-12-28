@@ -32,8 +32,11 @@ SOFTWARE.
               flds/2,
               flds_set/3,
               fld_template/2,
+              fld_template/3,
               fld_fields/2,
               fld_destroy/1]).
+
+:- meta_predicate fld:fld_template(*,*,2).
 
 :- dynamic(fld_object_def/2).
 
@@ -44,6 +47,11 @@ SOFTWARE.
 %! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
 % New is the old term with field updated.
 :- dynamic(fld_set/3).
+
+%! fld_default(+Field:atom, ?Default:term) is semidet.
+% A default is defined by the user, if no default is used then an uninstantiated variable will be used.
+:- multifile(fld_default/2).
+
 
 %! flds(?Fields:list, ?Object:term) is nondet.
 % Fields are a list of values that all exist in object.
@@ -59,11 +67,30 @@ flds_set([F|T], Obj, Newer) :-
 
 %! fld_template(?Name:atom, ?Template:list) is nondet.
 % template is an object with all fields as uninstaniated variables.
+% defaults are taken from the fld:fld_default/2 predicates.
 fld_template(Name, Template) :-
+    fld_template(Name, Template, fld_default).
+
+% ! fld_template(?Name:atom, ?Template:list, ++Goal:callable) is nondet.
+% template is an object with all fields as uninstaniated variables.
+% Goal determines the defaults for the fields or if there is not default
+% for a field then an uninstantiated variable is used.
+fld_template(Name, Template, Goal) :-
     fld_object_def(Name, Flds),
 
     length(Flds, Len),
-    obj(Name, Len, Template, _).
+    length(TemplateFlds, Len),
+    Template =.. [Name|TemplateFlds],
+    callable(Goal) ->
+    maplist(fld_add_default(Goal), Flds, TemplateFlds)
+    ;
+    true.
+
+
+fld_add_default(Goal, Field, Value) :-
+    call(Goal, Field, Value) -> true ; true.
+
+
 
 %! fld_object(++Name:atom, ++Fields:list) is det.
 % fields is a list of all fields that relate to object of name.
@@ -152,18 +179,5 @@ fld_fields(Obj, Fields) :-
     maplist(fld_field_object,Flds,Vals,Fields).
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

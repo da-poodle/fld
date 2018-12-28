@@ -56,8 +56,13 @@ false.
 ## fld/2
 Access the value of terms argument by name.
 ```prolog
-:- fld(name(N), person(greg, 32, male)).
+?- fld(name(N), person(greg, 32, male)).
 N = greg.
+```
+fld/2 (and flds/2) can be used to set the values of an object as well if the object is uninstantiated. eg:
+```prolog
+?- fld_template(person, P), fld(name(henry), P).
+P = person(henry, _, _).
 ```
 
 ## flds/2
@@ -94,6 +99,23 @@ F = person(_944, _950, _956).
 ?- fld_template(person, person(mary, 25, female)).
 true.
 ```
+When creating a new template a default mechanism is used to set values based on name. By defaul the fld:fld_default/2 predicate is used. For example
+```prolog
+?- assert(fld:fld_default(gender, unspecified)).
+true.
+
+?- fld_template(person, P).
+P = person(_944, _950, unspecified).
+```
+This is the same call as <code>fld_template(person, P, fld:fld_default).</code>
+
+## fld_template/3
+As per fld_template/2 but you can specify a goal that will be used for defaults. The goal has two parameters:
+ 1. the name of the field that the default is for. 
+ 1. the default value for the field. 
+
+> Note: If multiple defaults are specified for a field, then only the first will be used.
+
 ## fld_destroy/1
 Destroy and fld object so it can no longer be used. Not highly useful as objects should be created for the duration of a program, however it is needed for unit testing and maybe specific scenarios.
 ```prolog
@@ -162,11 +184,11 @@ registration_valid(RoadUser) :-
 
 test :-
     fld_template(car, C),
-    flds_set([registration('ABC-123'), expires(1544947900.570324)], C, C1),
-    registration_valid(C1).
+    flds([registration('ABC-123'), expires(1544947900.570324)], C),
+    registration_valid(C).
 
 test :-
     fld_template(bus, B),
-    flds_set([registration('DA-BUS01'), expires(1544947900.570324)], B, B1),
-    registration_valid(B1).
+    flds([registration('DA-BUS01'), expires(1544947900.570324)], B),
+    registration_valid(B).
 ```
