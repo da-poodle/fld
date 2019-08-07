@@ -29,7 +29,6 @@ SOFTWARE.
               fld_object/2,
               fld/2,
               fld_set/3,
-              flds/2,
               flds_set/3,
               fld_template/2,
               fld_template/3,
@@ -51,12 +50,6 @@ SOFTWARE.
 %! fld_default(+Field:atom, ?Default:term) is semidet.
 % A default is defined by the user, if no default is used then an uninstantiated variable will be used.
 :- multifile(fld_default/2).
-
-
-%! flds(?Fields:list, ?Object:term) is nondet.
-% Fields are a list of values that all exist in object.
-flds([], _).
-flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
 
 %! flds_set(?Fields:list, ?Old:term, ?New:term) is nondet.
 % new is the old term with all of fields updated.
