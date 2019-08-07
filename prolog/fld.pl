@@ -2,7 +2,7 @@
 
 MIT License
 
-Copyright (c) 2018 Neil Hoskins
+Copyright (c) 2019 Neil Hoskins
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,6 @@ SOFTWARE.
               fld_object/2,
               fld/2,
               fld_set/3,
-              flds_set/3,
               fld_template/2,
               fld_template/3,
               fld_fields/2,
@@ -51,12 +50,6 @@ SOFTWARE.
 % A default is defined by the user, if no default is used then an uninstantiated variable will be used.
 :- multifile(fld_default/2).
 
-%! flds_set(?Fields:list, ?Old:term, ?New:term) is nondet.
-% new is the old term with all of fields updated.
-flds_set([], O, O).
-flds_set([F|T], Obj, Newer) :-
-    fld_set(F, Obj, New),
-    flds_set(T, New, Newer).
 
 %! fld_template(?Name:atom, ?Template:list) is nondet.
 % template is an object with all fields as uninstaniated variables.
@@ -173,8 +166,11 @@ fld_fields(Obj, Fields) :-
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 
+
+
+
 % expand the type specific goals to be efficient
-% to do this look for a name of Type_flds and expand this to use the 
+% to do this look for a name of <type>_flds and expand this to use the 
 % actual object rather than the fld lookup method
 resolve_fld(Template, Getter) :- 
 	fld(Getter, Template) -> true
@@ -191,9 +187,6 @@ system:goal_expansion(Flds, (Object = Template)) :-
 
 % expand the flds term to use the multiple fld terms instead
 % this is signifiantly faster that using a list, but can fail if the field does not exist.
-
-% flds_to_fld(Object, Fld, fld(Fld, Object)).	
-
 flds_to_fld([], _, Last, Last).
 flds_to_fld([Fld|T], Object, Last, ','(Last, Result)) :-
 	flds_to_fld(T, Object, fld(Fld, Object), Result).
@@ -204,3 +197,19 @@ flds_to_fld([Fld|T], Object, Result) :-
 system:goal_expansion(flds(Flds, Object), Result) :-
 	flds_to_fld(Flds, Object, Result).
 
+% expand the <type>_flds_set to use two objects instead of a recursive list
+% throw an error if the field is not present in the template
+flds_set([], O, O).
+flds_set([F|T], Obj, Newer) :-
+    fld_set(F, Obj, New) -> flds_set(T, New, Newer)
+	;
+	Obj =.. [Name|_],
+	throw(fld_error(F, Name, 'fld mapping not found for object')).	
+
+system:goal_expansion(Flds, (Object = Template, NewObject = SetTemplate)) :-
+	Flds =.. [Name,List,Object,NewObject],
+	atom(Name),
+	atom_concat(FldType, '_flds_set', Name),
+	fld_template(FldType, Template),
+	fld_template(FldType, SetTemplate),
+	flds_set(List, Template, SetTemplate).	
