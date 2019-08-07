@@ -180,4 +180,14 @@ fld_fields(Obj, Fields) :-
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 
+% expand the type specific goals to be efficient
+% to do this look for a name of Type_flds and expand this to use the 
+% actual object rather than the fld lookup method
+resolve_fld(Template, Getter) :- fld(Getter, Template).	
 
+system:goal_expansion(Flds, (Object = Template)) :-
+	Flds =.. [Name,List,Object],
+	atom(Name),
+	atom_concat(FldType, '_flds', Name),
+	fld_template(FldType, Template),
+	maplist(resolve_fld(Template), List).
