@@ -183,11 +183,31 @@ fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 % expand the type specific goals to be efficient
 % to do this look for a name of Type_flds and expand this to use the 
 % actual object rather than the fld lookup method
-resolve_fld(Template, Getter) :- fld(Getter, Template).	
-
+resolve_fld(Template, Getter) :- 
+	fld(Getter, Template) -> true
+	;	
+	Template =.. [Name|_],
+	throw(fld_error(Getter, Name, 'fld mapping not found for object')).	
+		
 system:goal_expansion(Flds, (Object = Template)) :-
 	Flds =.. [Name,List,Object],
 	atom(Name),
 	atom_concat(FldType, '_flds', Name),
 	fld_template(FldType, Template),
 	maplist(resolve_fld(Template), List).
+
+% expand the flds term to use the multiple fld terms instead
+% this is signifiantly faster that using a list, but can fail if the field does not exist.
+
+% flds_to_fld(Object, Fld, fld(Fld, Object)).	
+
+flds_to_fld([], _, Last, Last).
+flds_to_fld([Fld|T], Object, Last, ','(Last, Result)) :-
+	flds_to_fld(T, Object, fld(Fld, Object), Result).
+
+flds_to_fld([Fld|T], Object, Result) :-
+	flds_to_fld(T, Object, fld(Fld, Object), Result).
+	
+system:goal_expansion(flds(Flds, Object), Result) :-
+	flds_to_fld(Flds, Object, Result).
+
