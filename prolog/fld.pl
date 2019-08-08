@@ -26,8 +26,12 @@ SOFTWARE.
 @licence MIT
 */
 :- module(fld, [
-			  fld/2,
-			  fld_set/3,
+              fld_object/2,
+              fld_default/2,
+              fld/2,
+              flds/2,
+              fld_set/3,
+              flds_set/3,
               fld_template/2,
               fld_template/3,
               fld_fields/2]).
@@ -37,10 +41,16 @@ SOFTWARE.
 :- discontiguous(fld:fld_object_def/2).
 :- multifile(fld_object_def/2).
 
+:- discontiguous(fld_object/2).
+:- multifile(fld_object/2).
+
 %! fld(?Field:term, ?Object:term) is det.
 % Field is a argument in an object.
 :- discontiguous(fld/2).
 :- multifile(fld/2).
+
+:- discontiguous(flds/2).
+:- multifile(flds/2).
 
 %! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
 % New is the old term with field updated.
@@ -49,7 +59,11 @@ SOFTWARE.
 
 %! fld_default(+Field:atom, ?Default:term) is semidet.
 % A default is defined by the user, if no default is used then an uninstantiated variable will be used.
+:- discontiguous(fld_default/2).
 :- multifile(fld_default/2).
+
+
+fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
 %! fld_template(?Name:atom, ?Template:list) is nondet.
 % template is an object with all fields as uninstaniated variables.
@@ -75,13 +89,14 @@ fld_template(Name, Template, Goal) :-
 fld_add_default(Goal, Field, Value) :-
     call(Goal, Field, Value) -> true ; true.
 
+blank_template(_,_).
 
 
 %! fld_object(++Name:atom, ++Fields:list) is det.
 % fields is a list of all fields that relate to object of name.
 % if the name does not exist then it is created.
 % fld_object(Name, Flds) :- fld_object_def(Name, Flds), !.
-	
+
 generate_flds([], _, _, _, []).
 generate_flds([F|T], Name, Len, N, [fld:fld(Fld, Obj), fld:fld_set(Fld, SetObj, NewObj)|Rest]) :-
 
@@ -125,18 +140,16 @@ fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
 system:term_expansion(':-'(fld_object(Name, Flds)), [fld:fld_object_def(Name, Flds)|GetSet]) :-
-	\+ fld_object_def(Name, Flds),
-	length(Flds, Len),
-	generate_flds(Flds, Name, Len, 0, GetSet).
-		
-	
+    \+ fld_object_def(Name, Flds),
+    length(Flds, Len),
+    generate_flds(Flds, Name, Len, 0, GetSet).
+
+
 %! fld_feilds(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
-
     Obj =.. [Name|Vals],
-    fld_object(Name, Flds),
-
+    fld_object_def(Name, Flds),
     maplist(fld_field_object,Flds,Vals,Fields).
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
@@ -145,46 +158,47 @@ fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 
 
 % expand the type specific goals to be efficient
-% to do this look for a name of <type>_flds and expand this to use the 
+% to do this look for a name of <type>_flds and expand this to use the
 % actual object rather than the fld lookup method
-resolve_fld(Template, Getter) :- 
-	fld(Getter, Template) -> true
-	;	
-	Template =.. [Name|_],
-	throw(fld_error(Getter, Name, 'fld mapping not found for object')).	
-		
+resolve_fld(Template, Getter) :-
+    fld(Getter, Template)
+    ;
+    Template =.. [Name|_],
+    throw(fld_error(Getter, Name, 'fld mapping not found for object')).
+
 system:goal_expansion(Flds, (Object = Template)) :-
-	Flds =.. [Name,List,Object],
-	atom(Name),
-	atom_concat(FldType, '_flds', Name),
-	fld_template(FldType, Template),
-	maplist(resolve_fld(Template), List).
+    Flds =.. [Name,List,Object],
+    atom(Name),
+    atom_concat(FldType, '_flds', Name),
+    fld_template(FldType, Template, blank_template),
+    maplist(resolve_fld(Template), List).
+
 
 % expand the flds term to use the multiple fld terms instead
 % this is signifiantly faster that using a list, but can fail if the field does not exist.
 flds_to_fld([], _, Last, Last).
 flds_to_fld([Fld|T], Object, Last, ','(Last, Result)) :-
-	flds_to_fld(T, Object, fld(Fld, Object), Result).
+    flds_to_fld(T, Object, fld(Fld, Object), Result).
 
 flds_to_fld([Fld|T], Object, Result) :-
-	flds_to_fld(T, Object, fld(Fld, Object), Result).
-	
+    flds_to_fld(T, Object, fld(Fld, Object), Result).
+
 system:goal_expansion(flds(Flds, Object), Result) :-
-	flds_to_fld(Flds, Object, Result).
+    flds_to_fld(Flds, Object, Result).
 
 % expand the <type>_flds_set to use two objects instead of a recursive list
 % throw an error if the field is not present in the template
 flds_set([], O, O).
 flds_set([F|T], Obj, Newer) :-
     fld_set(F, Obj, New) -> flds_set(T, New, Newer)
-	;
-	Obj =.. [Name|_],
-	throw(fld_error(F, Name, 'fld mapping not found for object')).	
+    ;
+    Obj =.. [Name|_],
+    throw(fld_error(F, Name, 'fld mapping not found for object')).
 
 system:goal_expansion(Flds, (Object = Template, NewObject = SetTemplate)) :-
-	Flds =.. [Name,List,Object,NewObject],
-	atom(Name),
-	atom_concat(FldType, '_flds_set', Name),
-	fld_template(FldType, Template),
-	fld_template(FldType, SetTemplate),
-	flds_set(List, Template, SetTemplate).	
+    Flds =.. [Name,List,Object,NewObject],
+    atom(Name),
+    atom_concat(FldType, '_flds_set', Name),
+    fld_template(FldType, Template, blank_template),
+    fld_template(FldType, SetTemplate, blank_template),
+    flds_set(List, Template, SetTemplate).
