@@ -34,7 +34,9 @@ SOFTWARE.
               flds_set/3,
               fld_template/2,
               fld_template/3,
-              fld_fields/2]).
+              fld_fields/2,
+              fld_fields/3
+          ]).
 
 :- meta_predicate fld:fld_template(*,*,2).
 
@@ -66,18 +68,17 @@ SOFTWARE.
 fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
 %! fld_template(?Name:atom, ?Template:list) is nondet.
-% template is an object with all fields as uninstaniated variables.
+% template is an object with all fields as uninstantiated variables.
 % defaults are taken from the fld:fld_default/2 predicates.
 fld_template(Name, Template) :-
     fld_template(Name, Template, fld_default).
 
 % ! fld_template(?Name:atom, ?Template:list, ++Goal:callable) is nondet.
-% template is an object with all fields as uninstaniated variables.
+% template is an object with all fields as uninstantiated variables.
 % Goal determines the defaults for the fields or if there is not default
 % for a field then an uninstantiated variable is used.
 fld_template(Name, Template, Goal) :-
     fld_object_def(Name, Flds),
-
     length(Flds, Len),
     length(TemplateFlds, Len),
     Template =.. [Name|TemplateFlds],
@@ -85,7 +86,7 @@ fld_template(Name, Template, Goal) :-
     maplist(fld_add_default(Goal), Flds, TemplateFlds)
     ;
     true.
-
+	
 fld_add_default(Goal, Field, Value) :-
     call(Goal, Field, Value) -> true ; true.
 
@@ -139,18 +140,44 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
-system:term_expansion(':-'(fld_object(Name, Flds)), [fld:fld_object_def(Name, Flds)|GetSet]) :-
-    \+ fld_object_def(Name, Flds),
-    length(Flds, Len),
-    generate_flds(Flds, Name, Len, 0, GetSet).
+resolve_parent_tree(Name, Flds, Name, Flds) :- Name \= _/_.
+resolve_parent_tree(Child/Parent, NewFlds, Name, AllFlds) :-
+	resolve_parent_tree(Child, NewFlds, Name, ChildFlds),
+	fld_object_def(Parent, Flds),
+	list_to_set(Flds, SetOfParentFlds),
+	list_to_set(ChildFlds, SetOfChildFlds),
+	union(SetOfChildFlds, SetOfParentFlds, AllFlds).
+	
+system:term_expansion(':-'(fld_object(Name, Flds)), [fld:fld_object_def(GenName, GenFlds)|GetSet]) :-
+	resolve_parent_tree(Name, Flds, GenName, GenFlds),
+    \+ fld_object_def(GenName, GenFlds),
+    length(GenFlds, Len),
+	format('generating ~w~n', GenFlds),
+    generate_flds(GenFlds, GenName, Len, 0, GetSet).
 
 
-%! fld_feilds(?Object:term, ?Fields:list) is semidet.
+%! fld_fields(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
+    fld_fields(Obj, _, Fields).
+
+%! fld_fields(?Object:term, +Name:list, ?Fields:list) is semidet.
+% return a list of all fields for object as terms instead of atoms and
+% the name.
+%
+% Either the Name and List are ground or the Object is ground
+fld_fields(Obj, Name, Fields) :-
+    compound(Obj),
     Obj =.. [Name|Vals],
     fld_object_def(Name, Flds),
     maplist(fld_field_object,Flds,Vals,Fields).
+fld_fields(Obj, Name, Fields) :-
+    atom(Name),
+    is_list(Fields),
+    fld_object_def(Name, Flds),
+    maplist(fld_field_object,Flds,Vals,Fields),
+    Obj =.. [Name|Vals].
+
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 
