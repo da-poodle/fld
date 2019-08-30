@@ -86,7 +86,7 @@ fld_template(Name, Template, Goal) :-
     maplist(fld_add_default(Goal), Flds, TemplateFlds)
     ;
     true.
-	
+
 fld_add_default(Goal, Field, Value) :-
     call(Goal, Field, Value) -> true ; true.
 
@@ -144,15 +144,12 @@ resolve_parent_tree(Name, Flds, Name, Flds) :- Name \= _/_.
 resolve_parent_tree(Child/Parent, NewFlds, Name, AllFlds) :-
 	resolve_parent_tree(Child, NewFlds, Name, ChildFlds),
 	fld_object_def(Parent, Flds),
-	list_to_set(Flds, SetOfParentFlds),
-	list_to_set(ChildFlds, SetOfChildFlds),
-	union(SetOfChildFlds, SetOfParentFlds, AllFlds).
-	
+        append(Flds, ChildFlds, AllFlds).
+
 system:term_expansion(':-'(fld_object(Name, Flds)), [fld:fld_object_def(GenName, GenFlds)|GetSet]) :-
-	resolve_parent_tree(Name, Flds, GenName, GenFlds),
+    resolve_parent_tree(Name, Flds, GenName, GenFlds),
     \+ fld_object_def(GenName, GenFlds),
     length(GenFlds, Len),
-	format('generating ~w~n', GenFlds),
     generate_flds(GenFlds, GenName, Len, 0, GetSet).
 
 
