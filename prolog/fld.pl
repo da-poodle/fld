@@ -226,3 +226,23 @@ system:goal_expansion(Flds, (Object = Template, NewObject = SetTemplate)) :-
     fld_template(FldType, Template, blank_template),
     fld_template(FldType, SetTemplate, blank_template),
     flds_set(List, Template, SetTemplate).
+
+
+
+% Convert a view definition to an fld defined object
+%
+% Setter - convert viewname/flds to viewname(Obj, fld1, fld2)
+%
+view_fld_to_var(Template, FldName, Var) :-
+    FldTerm =.. [FldName,Var],
+    fld(FldTerm, Template).
+
+view_to_terms(ViewName, ViewFlds, ViewTerm) :-
+    fld_object(FldType, ObjFlds),
+    subset(ViewFlds, ObjFlds),
+    fld_template(FldType, Template, blank_template),
+    maplist(view_fld_to_var(Template), ViewFlds, Vars),
+    ViewTerm =.. [ViewName,Template|Vars].
+
+system:term_expansion(:-(fld_view(Name, ViewFlds)), ViewTerms) :-
+    findall(T, view_to_terms(Name, ViewFlds, T), ViewTerms).
