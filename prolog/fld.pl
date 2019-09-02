@@ -86,7 +86,7 @@ fld_template(Name, Template, Goal) :-
     maplist(fld_add_default(Goal), Flds, TemplateFlds)
     ;
     true.
-	
+
 fld_add_default(Goal, Field, Value) :-
     call(Goal, Field, Value) -> true ; true.
 
@@ -144,14 +144,12 @@ resolve_parent_tree(Name, Flds, Name, Flds) :- Name \= _/_.
 resolve_parent_tree(Child/Parent, NewFlds, Name, AllFlds) :-
 	resolve_parent_tree(Child, NewFlds, Name, ChildFlds),
 	fld_object_def(Parent, Flds),
-	list_to_set(Flds, SetOfParentFlds),
-	list_to_set(ChildFlds, SetOfChildFlds),
-	union(SetOfChildFlds, SetOfParentFlds, AllFlds).
-	
+	union(Flds, ChildFlds, AllFlds).
+
 system:term_expansion(':-'(fld_object(Name, Flds)), [fld:fld_object_def(GenName, GenFlds)|GetSet]) :-
 	resolve_parent_tree(Name, Flds, GenName, GenFlds),
     \+ fld_object_def(GenName, GenFlds),
-    length(GenFlds, Len),	
+    length(GenFlds, Len),
     generate_flds(GenFlds, GenName, Len, 0, GetSet).
 
 
@@ -230,8 +228,8 @@ system:goal_expansion(Flds, (Object = Template, NewObject = SetTemplate)) :-
     flds_set(List, Template, SetTemplate).
 
 % views - convert an fldv goal to a lookup for the type
-% this allows two things, one is to have nicer looking code 
-% by allowing for the following: 
+% this allows two things, one is to have nicer looking code
+% by allowing for the following:
 % fldv(Obj, f1(_), f2(_), ...)
 %
 % But also allows a single inference to lookup data for multiple flds
@@ -242,53 +240,51 @@ flds_to_list_of_names([], []).
 flds_to_list_of_names([H|T], [Name|R]) :-
 	H =.. [Name,_],
 	flds_to_list_of_names(T, R).
-	
-map_fld(Obj, Fld) :- fld(Fld, Obj).	
-		
+
+map_fld(Obj, Fld) :- fld(Fld, Obj).
+
 convert_types_to_view(FldstoSet, ViewNum, FldName) :-
 	fld_template(FldName, Template, blank_template),
 	maplist(map_fld(Template), FldstoSet),
-	\+ fld_view(_, Template, FldstoSet) -> 
+	\+ fld_view(_, Template, FldstoSet) ->
 		assert(fld_view(ViewNum, Template, FldstoSet))
 	; true.
 
 expand_fld_view(A, fld:fld_view(ViewNum, Obj, FldstoSet)) :-
 	A =.. [fldv,Obj|FldstoSet],
-	flds_to_list_of_names(FldstoSet, FldNames),		
-	findall(Name, (fld_object_def(Name,Flds), subset(FldNames, Flds)), Types),	
+	flds_to_list_of_names(FldstoSet, FldNames),
+	findall(Name, (fld_object_def(Name,Flds), subset(FldNames, Flds)), Types),
 	gensym(fld_view, ViewNum),
-	maplist(convert_types_to_view(FldstoSet, ViewNum), Types).	
-	
+	maplist(convert_types_to_view(FldstoSet, ViewNum), Types).
+
 system:goal_expansion(A, B) :-
 	expand_fld_view(A, B).
-	
-	
+
+
 % set views - convert an fldv goal to a set lookup for the type
 % this is the same as the get version, but for sets
 % The first param is the original object
 % The second param is the updated object
 % The remaining params are the fields to set
-% eg: 
+% eg:
 % fldv_set(Obj, SetObj, f1(_), f2(_), ...)
 %
 :- dynamic fld_set_view/4.
-		
-fld_values(Fld, Val) :- Fld =..	[_,Val].
-		
+
 convert_types_to_set_view(FldstoSet, ViewNum, FldName) :-
 	fld_template(FldName, Template, blank_template),
     fld_template(FldName, SetTemplate, blank_template),
 	flds_set(FldstoSet, Template, SetTemplate),
-	\+ fld_set_view(_, Template, SetTemplate, FldstoSet) -> 
+	\+ fld_set_view(_, Template, SetTemplate, FldstoSet) ->
 		assert(fld_set_view(ViewNum, Template, SetTemplate, FldstoSet))
 	; true.
 
 expand_fld_view_set(A, fld:fld_set_view(ViewNum, Obj, SetObj, FldstoSet)) :-
 	A =.. [fldv_set,Obj,SetObj|FldstoSet],
 	flds_to_list_of_names(FldstoSet, FldNames),
-	findall(Name, (fld_object_def(Name,Flds), subset(FldNames, Flds)), Types),	
+	findall(Name, (fld_object_def(Name,Flds), subset(FldNames, Flds)), Types),
 	gensym(fld_view, ViewNum),
-	maplist(convert_types_to_set_view(FldstoSet, ViewNum), Types).	
-	
+	maplist(convert_types_to_set_view(FldstoSet, ViewNum), Types).
+
 system:goal_expansion(A, B) :-
-	expand_fld_view_set(A, B).	
+	expand_fld_view_set(A, B).
