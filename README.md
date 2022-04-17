@@ -39,6 +39,8 @@ API Reference
 ===================
 ## fld_object/2
 Define a term and the named fields that can be used with the fld library.
+
+This is now a directive that is specified at compile time.
 ```prolog
 :- fld_object(person, [name, age, gender]).
 ```
@@ -68,7 +70,7 @@ P = person(henry, _, _).
 ## flds/2
 Access several arguments by name in one call.
 ```prolog
-:- fld([name(N),gender(G)], person(greg, 32, male)).
+?- fld([name(N),gender(G)], person(greg, 32, male)).
 N = greg.
 G = male.
 ```
@@ -76,16 +78,17 @@ G = male.
 ## fld_set/3
 Replace the value of a terms argument by name.
 ```prolog
-:- fld_set(name(frank), person(greg, 32, male), P).
+?- fld_set(name(frank), person(greg, 32, male), P).
 P = person(frank, 32, male).
 ```
 
 ## flds_set/3
 Replace several term arguments by name.
 ```prolog
-:- flds_set([name(frank), age(25)], person(greg, 32, male), P).
+?- flds_set([name(frank), age(25)], person(greg, 32, male), P).
 P = person(frank,25,male).
 ```
+
 ## fld_template/2
 This predicate has two uses.
 
@@ -109,26 +112,18 @@ P = person(_944, _950, unspecified).
 ```
 This is the same call as <code>fld_template(person, P, fld:fld_default).</code>
 
-## fld_template/3
-As per fld_template/2 but you can specify a goal that will be used for defaults. The goal has two parameters:
- 1. the name of the field that the default is for. 
- 1. the default value for the field. 
+## fld_fields/2
+The first parameter is an fld object, the second is a list of named terms. 
+This predicate only works one way, to convert an existing fld object to a list of terms.
 
-> Note: If multiple defaults are specified for a field, then only the first will be used.
+For example:
 
-## fld_destroy/1
-Destroy and fld object so it can no longer be used. Not highly useful as objects should be created for the duration of a program, however it is needed for unit testing and maybe specific scenarios.
 ```prolog
-?- fld(name(N), person(greg, 35, male)).
-N = greg.
+:- fld_object(person, [name, age, gender]).
 
-?- fld_destroy(person).
-true.
-
-?- fld(name(N), person(greg, 35, male)).
-false.
+?- fld_fields(person('Fred', 32, male), Fields).
+Fields = [name('Fred'), age(32), gender(male)].
 ```
-fld_destroy/1 will always succeed.
 
 Examples
 ========

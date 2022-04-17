@@ -32,9 +32,7 @@ SOFTWARE.
     flds/2,
     flds_set/3,
     fld_template/2,
-    fld_fields/2,
-    fld_mapper/2,
-    fld_map/2
+    fld_fields/2
 ]).
 
 %! fld_object(++Name:atom, ++Fields:list) is det.
@@ -125,69 +123,24 @@ fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
 % expand the directives for the the fld_object.
-user:term_expansion((:- fld_object(Name, Flds)), [fld:fld_object_def(Name, Flds)|Result]) :-
+user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     must_be(atom, Name),
     must_be(list, Flds),
     
+    fld_object_def(Name, Flds) -> Preds = []
+    ;
     length(Flds, Len),
     generate_flds(Flds, Name, Len, 0, Getters, Setters),
     append(Getters, Setters, Result),
+    Preds = [fld:fld_object_def(Name, Flds)|Result],
     !.
 
 %! fld_feilds(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
-
     Obj =.. [Name|Vals],
     fld_object_def(Name, Flds),
 
     maplist(fld_field_object,Flds,Vals,Fields).
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
-
-%! fld_map(?Obj1:term, ?Obj2:term) is nondet.
-% Obj1 has fields mapped from Obj2.
-:- dynamic(fld_map/2).
-
-%! fld_mapper(?Object1:atom, ?Object1:atom) is det.
-% A mapper is created to map fields between object1 and object2.
-% shared fields must have the same values.
-fld_mapper(O1, O2) :- 
-    fld_object_def(O1, Fields1),
-    fld_object_def(O2, Fields2),
-    
-    append(Fields1, Fields2, AllFields),
-    list_to_set(AllFields, UniqueFields),
-
-    list_template(UniqueFields, MasterTemplate),
-    list_template(Fields1, Template1),
-    list_template(Fields2, Template2),
-    
-    % transform the templates into the master variables
-    transform_map(Template1, Fields1, MasterTemplate, UniqueFields),
-    transform_map(Template2, Fields2, MasterTemplate, UniqueFields),
-
-    Map1 =.. [O1|Template1],
-    Map2 =.. [O2|Template2],
-
-    (
-        fld_map(Map1, Map2) -> true
-        ;
-        assert(fld_map(Map1, Map2))
-    ), !.
-
-list_template(L1, Template) :-
-    length(L1, Len),
-    length(Template, Len).
-
-transform_map([], _, _, _).
-transform_map([A|T], [F|Ft], MasterTemplate, UniqueFields) :-
-    transform_map_(UniqueFields, MasterTemplate, A, F),
-    transform_map(T, Ft, MasterTemplate, UniqueFields).
-    
-transform_map_([F|_], [T|_], T, F).
-transform_map_([F|Ft], [_|Mt], Tv, Tf) :-
-    dif(F, Tf),
-    transform_map_(Ft, Mt, Tv, Tf).
-
-    
