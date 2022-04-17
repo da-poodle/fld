@@ -26,32 +26,36 @@ SOFTWARE.
 @licence MIT
 */
 :- module(fld, [
-              fld_object/2,
-              fld/2,
-              fld_set/3,
-              flds/2,
-              flds_set/3,
-              fld_template/2,
-              fld_template/3,
-              fld_fields/2,
-              fld_destroy/1]).
+    (fld_object)/2,
+    fld/2,
+    fld_set/3,
+    flds/2,
+    flds_set/3,
+    fld_template/2,
+    fld_fields/2
+]).
 
-:- meta_predicate fld:fld_template(*,*,2).
+%! fld_object(++Name:atom, ++Fields:list) is det.
+% fields is a list of all fields that relate to object of name.
+% this item will be created at compliation time and will generate the following:
+% - fld/2 for each field in Fields.
+% - fld_set/3 for each field in fields.
+%
+% After compilation, calling fld_object will return the list of fields for a previously
+% defined object.
+fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
-:- dynamic(fld_object_def/2).
+:- multifile(fld_object_def/2).
 
 %! fld(?Field:term, ?Object:term) is det.
 % Field is a argument in an object.
-:- dynamic(fld/2).
+%:- dynamic(fld/2).
+:- multifile(fld/2).
 
 %! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
 % New is the old term with field updated.
-:- dynamic(fld_set/3).
-
-%! fld_default(+Field:atom, ?Default:term) is semidet.
-% A default is defined by the user, if no default is used then an uninstantiated variable will be used.
-:- multifile(fld_default/2).
-
+%:- dynamic(fld_set/3).
+:- multifile(fld_set/3).
 
 %! flds(?Fields:list, ?Object:term) is nondet.
 % Fields are a list of values that all exist in object.
@@ -69,64 +73,14 @@ flds_set([F|T], Obj, Newer) :-
 % template is an object with all fields as uninstaniated variables.
 % defaults are taken from the fld:fld_default/2 predicates.
 fld_template(Name, Template) :-
-    fld_template(Name, Template, fld_default).
-
-% ! fld_template(?Name:atom, ?Template:list, ++Goal:callable) is nondet.
-% template is an object with all fields as uninstaniated variables.
-% Goal determines the defaults for the fields or if there is not default
-% for a field then an uninstantiated variable is used.
-fld_template(Name, Template, Goal) :-
     fld_object_def(Name, Flds),
-
     length(Flds, Len),
     length(TemplateFlds, Len),
-    Template =.. [Name|TemplateFlds],
-    callable(Goal) ->
-    maplist(fld_add_default(Goal), Flds, TemplateFlds)
-    ;
-    true.
+    Template =.. [Name|TemplateFlds].
 
-
-fld_add_default(Goal, Field, Value) :-
-    call(Goal, Field, Value) -> true ; true.
-
-
-
-%! fld_object(++Name:atom, ++Fields:list) is det.
-% fields is a list of all fields that relate to object of name.
-% if the name does not exist then it is created.
-fld_object(Name, Flds) :- fld_object_def(Name, Flds), !.
-fld_object(Name, Flds) :-
-    atom(Name),
-    is_list(Flds),
-
-    % create the object only if it doesn't already exist
-    \+ fld_object(Name, _),
-    assert(fld_object_def(Name, Flds)),
-
-    length(Flds, Len),
-    generate_flds(Flds, Name, Len, 0),
-    !.
-
-
-%!  fld_destroy(++Name:atom) is det.
-% The fld_object that relates to name is no longer usable.
-fld_destroy(Name) :- \+ fld_object(Name, _).
-fld_destroy(Name) :-
-    atom(Name),
-    fld_object(Name, Flds),
-
-    length(Flds, Len),
-    maplist(obj(Name, Len), [Obj, SetObj, NewObj], _),
-
-    retractall(fld(_,Obj)),
-    retractall(fld_set(_,SetObj,NewObj)),
-    retractall(fld_object(Name,Flds)),
-    !.
-
-
-generate_flds([], _, _, _).
-generate_flds([F|T], Name, Len, N) :-
+/* Generate fld_object_def/2, fld/2 and fld_set/3 predicates */
+generate_flds([], _, _, _, [], []).
+generate_flds([F|T], Name, Len, N, [Getter|MoreGetters],[Setter|MoreSetters]) :-
 
     % the field that will be the first argument
     Fld =.. [F, X],
@@ -134,24 +88,23 @@ generate_flds([F|T], Name, Len, N) :-
     % the getter
     obj(Name, Len, Obj, Flds),
     fld_arg(X, Flds, N),
-    assert(fld(Fld, Obj)),
+    Getter = fld:fld(Fld, Obj),
 
     % the setter
     obj(Name, Len, SetObj, SetObjFlds),
     obj(Name, Len, NewObj, NewObjFlds),
     fld_set_arg(X, SetObjFlds, NewObjFlds, N),
-    assert(fld_set(Fld, SetObj, NewObj)),
+    Setter = fld:fld_set(Fld, SetObj, NewObj),
 
     % next field uses the next argument
     N1 is N + 1,
-    generate_flds(T, Name, Len, N1).
+    generate_flds(T, Name, Len, N1, MoreGetters, MoreSetters).
 
 
 % helper to generate blank objects
 obj(Name, Len, Obj, Flds) :-
     length(Flds, Len),
     Obj =.. [Name|Flds].
-
 
 % generate the second argument of the getter
 fld_arg(Val, [Val|_], 0).
@@ -169,15 +122,25 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
+% expand the directives for the the fld_object.
+user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
+    must_be(atom, Name),
+    must_be(list, Flds),
+    
+    fld_object_def(Name, Flds) -> Preds = []
+    ;
+    length(Flds, Len),
+    generate_flds(Flds, Name, Len, 0, Getters, Setters),
+    append(Getters, Setters, Result),
+    Preds = [fld:fld_object_def(Name, Flds)|Result],
+    !.
+
 %! fld_feilds(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
-
     Obj =.. [Name|Vals],
-    fld_object(Name, Flds),
+    fld_object_def(Name, Flds),
 
     maplist(fld_field_object,Flds,Vals,Fields).
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
-
-

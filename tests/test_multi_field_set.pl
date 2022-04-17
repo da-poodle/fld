@@ -1,4 +1,4 @@
-:- use_module(library(fld)).
+:- use_module('../prolog/fld').
 
 :- fld_object(person2, [name, age, gender, occupation, shoe_size]).
 
