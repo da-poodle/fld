@@ -124,7 +124,9 @@ user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     !.
 
 
-
+/*
+    FLD_FIELDS/2.
+*/
 %! fld_feilds(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
 fld_fields(Obj, Fields) :-
@@ -146,7 +148,7 @@ fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 flds([], _).
 flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
 
-map_getter_fields_to_value(FldObject, FldNames, FldValues, Result) :-
+map_getter_fields_to_value(FldObject, FldNames, FldValues, Template) :-
     fld_object_def(FldObject, Flds),
 
     % create a list of variables to substitute for the flds, 
@@ -154,7 +156,7 @@ map_getter_fields_to_value(FldObject, FldNames, FldValues, Result) :-
     maplist(value_to_fld(FldNames, FldValues), Flds, GetValues),
 
     % create the result from the values.
-    Result =.. [FldObject | GetValues].
+    Template =.. [FldObject | GetValues].
 
 value_to_fld(FldNames, FldValues, Fld, Value) :-
     memberchk(Fld, FldNames) -> 
@@ -192,4 +194,33 @@ flds_set([F|T], Obj, Newer) :-
     fld_set(F, Obj, New),
     flds_set(T, New, Newer).
 
+map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out) :-
+    fld_object_def(FldObject, Flds),
+    fld_template(FldObject, In),
+    In =.. [_|Setters],
+    fld_template(FldObject, Out),
+    Out =.. [_|NewSetters],
 
+    maplist(value_set_to_fld(FldNames, FldValues), Flds, Setters, NewSetters).
+
+value_set_to_fld(FldNames, FldValues, Fld, Setter, NewSetter) :-
+    memberchk(Fld, FldNames) -> 
+        nth0(Idx, FldNames, Fld),
+        nth0(Idx, FldValues, NewSetter)
+    ;
+    NewSetter = Setter.
+
+
+% Map a list of fields directly to an object so that a single operation is required
+% to access all the fields
+user:goal_expansion(flds_set(FldArgs, ObjIn, ObjOut), (ObjIn = In, ObjOut = Out)) :-
+    is_list(FldArgs),
+
+    % create a list of the fields that are being accessed
+    maplist(split_fld_args, FldArgs, FldNames, FldValues),
+
+    % find ALL objects that have the set of fields
+    % only sets that have one fld_object can be processed.
+    findall(Name, (fld_object_def(Name, Flds), subset(FldNames, Flds)), [FldObject]),
+
+    map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out).
