@@ -1,49 +1,67 @@
 FLD 
 ===
-
 A library for accessing and updating term arguments in Prolog in a position independent way. 
 
 Installation
 ============
 To install the fld library, type the following in the SWI-Prolog shell:
 ```prolog
-  ?- pack_install('https://github.com/da-poodle/fld.git').
+  ?- pack_install('fld').
   true.
 ```
 
-Usage
+Quick Start
 =====
-The library allows the definition of data that will be used in a program. To define a 'type' then use fld_object/2. 
+The fld library allows the definition of term templates that can be efficiently accessed at the argument level. To define a 'type' then use fld_object/2. Terms are stored as plain terms, so that calls to the CSV and ODBC APIs can use the object mechanism.  
 
-eg: To create a person object, the following could be added to prolog.
+eg: To create a person object, the following could be added to a prolog file.
 ```prolog
+:- use_module(library(fld)).
+
 :- fld_object(person, [name, age, gender]).
 ```
-fld uses the concept of 'business types' so in this case there are four types:
-1. person
-1. name
-1. age
-1. gender 
 
-a person is a composite type that contains the other three. The names represent a specific type of data and 
-should be used consistently throughout a program. Name for example might not only relate to people, but the validation etc.. should be the same for all types that use it.
+This will create accessors for a ``person/3`` term. 
 
-Note that this is similar to library(record) except that specific names are not used for each object type. There are
-a few reasons for this: 
-* Specific names are hard to remember and hard to read
-* Multiple types may share fields with the same names. if they do then predicates can be written to handle multiple types. 
-* Validation can then be done at a type level rather than an object level which brings consistency in large programs. 
+To create a blank term, use the ``fld_template/2``.
+```prolog
+?- fld_template(person, P).
+P = person(_111, _112, _113).
+```
 
+To set a field, use ``fld_set/3``, to set multiple fields use ``flds_set/3``.
+
+```prolog
+?- fld_set(name('Fred'), $P, P1).
+P1 = person('Fred', _112, _113).
+
+?- flds_set([age(32), gender(male)], $P1, P2).
+P2 = person('Fred', 32, male). 
+```
+
+To get the current value of a field, use ``fld/2``, to get multiple fields use ``flds/2``.
+
+```prolog
+?- fld(name(Name), $P2).
+Name = 'Fred'.
+
+?- flds([name(Name), age(Age)], $P2).
+Name = 'Fred,
+Age = 32.
+```
 
 API Reference
 ===================
+
 ## fld_object/2
 Define a term and the named fields that can be used with the fld library.
 
-This is now a directive that is specified at compile time.
+This is a directive that is specified at compile time.
 ```prolog
 :- fld_object(person, [name, age, gender]).
 ```
+This will create a set of fld/2 and fld_set/3 predicates for the 'person' object, that can be used to access each field. 
+
 Further calls to fld_object/2 with the same parameters will unify with an existing fld_object. eg: 
 ```prolog
 ?- fld_object(person, F).
@@ -56,11 +74,14 @@ false.
 ```
 
 ## fld/2
-Access the value of terms argument by name.
+Access a single argument in an fld term by name.
+
+eg:
 ```prolog
 ?- fld(name(N), person(greg, 32, male)).
 N = greg.
 ```
+
 fld/2 (and flds/2) can be used to set the values of an object as well if the object is uninstantiated. eg:
 ```prolog
 ?- fld_template(person, P), fld(name(henry), P).
@@ -75,8 +96,30 @@ N = greg.
 G = male.
 ```
 
+Flds/2 will be expanded so that only one call is made to access all the arguments, unless there are two objects that share the same set of argument names. For example, consider the following objects:
+
+```prolog
+:- fld_object(o1, [a,b,c]).
+:- fld_object(o2, [b,c,d]).
+```
+
+If ``flds/2`` is called for a unique set of fields for ``o1`` then the following code is created:
+
+```prolog
+?- O1 = o1(a, b, c), expand_term(flds([a(A), b(B)], O1), ExpandedTerm).
+ExpandedTerm = O1 = o1(A, B, _).
+```
+
+But if ``flds/2`` is created with a non unique set, then a more generic call is made. 
+
+```prolog
+?- O1 = a1(a, b, c), expand_term(flds([b(B), c(C)], O1), ExpandedTerm).
+ExpandedTerm = flds([b(B), c(C)], O1).
+```
+This expansion is done at compile time, to allow a single inference to access multiple arguments, and by listing the source, the transformation can be seen.
+
 ## fld_set/3
-Replace the value of a terms argument by name.
+Replace the value of a single argument in an fld object by name.
 ```prolog
 ?- fld_set(name(frank), person(greg, 32, male), P).
 P = person(frank, 32, male).
@@ -88,6 +131,7 @@ Replace several term arguments by name.
 ?- flds_set([name(frank), age(25)], person(greg, 32, male), P).
 P = person(frank,25,male).
 ```
+This has similar expansion rules as ``flds/2`` with regards to uniqueness. The code produced is different and for a unique set of fields there is a garenteed 2 inferences for all fields. 
 
 ## fld_template/2
 This predicate has two uses.
