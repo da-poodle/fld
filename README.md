@@ -52,13 +52,6 @@ Age = 32.
 
 API Reference
 ===================
-- [fld_object/2](#fld_object/2)
-- [fld/2](#fld/2)
-- [flds/2](#flds/2)
-- [fld_set/3](#fld_set/3)
-- [flds_set/3](#flds_set/3)
-- [fld_template/2](#fld_template/2)
-- [fld_fields/2](#fld_fields/2)
 
 ## fld_object/2
 Define a term and the named fields that can be used with the fld library.
