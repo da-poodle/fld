@@ -1,5 +1,5 @@
 name(fld).
-version('1.0.0').
+version('1.0.1').
 title('Object system that allows easy and efficient access to term arguments by name.').
 keywords([field,term,refactor,odbc,csv]).
 author('Neil Hoskins', 'https://github.com/da-poodle').
