@@ -57,14 +57,21 @@ fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 %:- dynamic(fld_set/3).
 :- multifile(fld_set/3).
 
+/* 
+    FLD_TEMPLATE 
+*/
+
 %! fld_template(?Name:atom, ?Template:list) is nondet.
 % template is an object with all fields as uninstaniated variables.
-% defaults are taken from the fld:fld_default/2 predicates.
 fld_template(Name, Template) :-
     fld_object_def(Name, Flds),
     length(Flds, Len),
     length(TemplateFlds, Len),
     Template =.. [Name|TemplateFlds].
+
+/* 
+    FLD_OBJECT 
+*/
 
 /* Generate fld_object_def/2, fld/2 and fld_set/3 predicates */
 generate_flds([], _, _, _, [], []).
@@ -209,7 +216,6 @@ value_set_to_fld(FldNames, FldValues, Fld, Setter, NewSetter) :-
         nth0(Idx, FldValues, NewSetter)
     ;
     NewSetter = Setter.
-
 
 % Map a list of fields directly to an object so that a single operation is required
 % to access all the fields
