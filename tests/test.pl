@@ -20,9 +20,6 @@
 :- op(800, xfy, user:fld_type).
 :- op(299, xf, user:lazy).
 :- op(300, xf, user:many).
-:- op(900, fx, user:fld).
-:- op(900, fx, user:flds).
-
 
 
 % field attributes test
@@ -46,23 +43,24 @@ attrs(Name, Attr) :-
     fld_object_test(Name, B), maplist(fld_field_attributes, B, Attr).
 
 % fld/flds test
-fld(Obj:Fld) :-
-    fld(Fld, Obj).
+% fld(Obj:Fld) :-
+%     fld(Fld, Obj).
 
-fld(fld_type(Obj:Flds, Type)) :-
-    fld_template(Type, Obj),
-    fld(Flds, Obj).
+% fld(fld_type(Obj:Flds, Type)) :-
+%     fld_template(Type, Obj),
+%     fld(Flds, Obj).
 
-flds(Obj:Flds) :-
-    flds(Flds, Obj).
+% flds(Obj:Flds) :-
+%     flds(Flds, Obj).
 
-flds(fld_type(Obj:Flds, Type)) :-
-    fld_template(Type, Obj),
-    flds(Flds, Obj).
+% flds(fld_type(Obj:Flds, Type)) :-
+%     fld_template(Type, Obj),
+%     flds(Flds, Obj).
 
-test_op_flds(Name, Age, Sex) :-
-    P = person(fred, 32, male),
-    flds P:[name(Name), age(Age), gender(Sex)]. 
+test_op_flds(Name, Age, Occ) :-
+    fld_template(person2, P),
+    flds_set([name(fred), age(32), occupation(baker)],P, P1),
+    flds P1:[name(Name), age(Age), occupation(Occ)]. 
 
 test_op_fld(Name, Age, Sex) :-
     P = person(fred, 32, male),

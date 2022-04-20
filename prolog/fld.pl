@@ -27,13 +27,20 @@ SOFTWARE.
 */
 :- module(fld, [
     (fld_object)/2,
-    fld/2,
-    fld_set/3,
-    flds/2,
+    (fld)/1,
+    (fld)/2,
+    (fld_set)/3,
+    (flds)/1,
+    (flds)/2,
     flds_set/3,
     fld_template/2,
-    fld_fields/2
+    fld_fields/2,
+    op(900, fx, user:fld),
+    op(900, fx, user:flds)
 ]).
+
+%:- op(900, fx, user:fld).
+%:- op(900, fx, user:flds).
 
 %! fld_object(++Name:atom, ++Fields:list) is det.
 % fields is a list of all fields that relate to object of name.
@@ -49,12 +56,11 @@ fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
 %! fld(?Field:term, ?Object:term) is det.
 % Field is a argument in an object.
-%:- dynamic(fld/2).
-:- multifile(fld/2).
+:- multifile(/(fld,1)).
+:- multifile(/(fld,2)).
 
 %! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
 % New is the old term with field updated.
-%:- dynamic(fld_set/3).
 :- multifile(fld_set/3).
 
 /* 
@@ -75,7 +81,7 @@ fld_template(Name, Template) :-
 
 /* Generate fld_object_def/2, fld/2 and fld_set/3 predicates */
 generate_flds([], _, _, _, [], []).
-generate_flds([F|T], Name, Len, N, [Getter|MoreGetters],[Setter|MoreSetters]) :-
+generate_flds([F|T], Name, Len, N, [Getter,Getter2|MoreGetters],[Setter|MoreSetters]) :-
 
     % the field that will be the first argument
     Fld =.. [F, X],
@@ -83,13 +89,14 @@ generate_flds([F|T], Name, Len, N, [Getter|MoreGetters],[Setter|MoreSetters]) :-
     % the getter
     obj(Name, Len, Obj, Flds),
     fld_arg(X, Flds, N),
-    Getter = fld:fld(Fld, Obj),
+    Getter = (fld):(fld Obj:Fld),
+    Getter2 = (fld):(fld(Fld, Obj)),
 
     % the setter
     obj(Name, Len, SetObj, SetObjFlds),
     obj(Name, Len, NewObj, NewObjFlds),
     fld_set_arg(X, SetObjFlds, NewObjFlds, N),
-    Setter = fld:fld_set(Fld, SetObj, NewObj),
+    Setter = (fld):fld_set(Fld, SetObj, NewObj),
 
     % next field uses the next argument
     N1 is N + 1,
@@ -127,7 +134,7 @@ user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     length(Flds, Len),
     generate_flds(Flds, Name, Len, 0, Getters, Setters),
     append(Getters, Setters, Result),
-    Preds = [fld:fld_object_def(Name, Flds)|Result],
+    Preds = [(fld):fld_object_def(Name, Flds)|Result],
     !.
 
 
@@ -155,6 +162,10 @@ fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 flds([], _).
 flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
 
+%! flds(?Object:term:?Fields:list) is nondet.
+% Fields are a list of values that all exist in object.
+flds(Obj:Flds) :- flds(Flds, Obj).
+
 map_getter_fields_to_value(FldObject, FldNames, FldValues, Template) :-
     fld_object_def(FldObject, Flds),
 
@@ -175,9 +186,8 @@ value_to_fld(FldNames, FldValues, Fld, Value) :-
 split_fld_args(FldArg, FldName, FldValue) :-
     FldArg =.. [FldName, FldValue].
 
-% Map a list of fields directly to an object so that a single operation is required
-% to access all the fields
-user:goal_expansion(flds(FldArgs, Object), (Object = Result)) :-
+expand_flds(FldArgs, Result) :-
+    % TODO - check for type using var/nonvar check
     is_list(FldArgs),
 
     % create a list of the fields that are being accessed
@@ -189,6 +199,13 @@ user:goal_expansion(flds(FldArgs, Object), (Object = Result)) :-
 
     map_getter_fields_to_value(FldObject, FldNames, FldValues, Result).
 
+% Map a list of fields directly to an object so that a single operation is required
+% to access all the fields
+user:goal_expansion(flds(FldArgs, Object), (Object = Result)) :-
+    expand_flds(FldArgs, Result).
+
+user:goal_expansion(flds(Object:FldArgs), (Object = Result)) :-
+    expand_flds(FldArgs, Result).
 
 /*
     FLDS_SET/3.
