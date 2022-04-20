@@ -1,9 +1,3 @@
-:- use_module('../prolog/fld').
-
-:- fld_object(tt, [a,b,c]).
-:- fld_object(tt2, [x,y,c]).
-:- fld_object(tt3, [x,y,d]).
-
 manual_get_test(TT, A,B,C) :-
     flds([a(A),b(B),c(C)], TT).
 

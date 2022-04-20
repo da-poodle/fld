@@ -1,7 +1,3 @@
-:- use_module('../prolog/fld').
-
-:- fld_object(person2, [name, age, gender, occupation, shoe_size]).
-
 :- begin_tests(flds_set).
 
 test(set_fields_set_exists) :-

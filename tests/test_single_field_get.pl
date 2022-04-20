@@ -1,7 +1,3 @@
-:- use_module('../prolog/fld').
-
-:- fld_object(person, [name, age, gender]).
-
 :- begin_tests(fld_get).
 
 test(get_single_field_with_var, [nondet]) :-

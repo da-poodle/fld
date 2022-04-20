@@ -1,7 +1,3 @@
-:- use_module('../prolog/fld').
-
-:- fld_object(person, [name, age, gender]).
-
 people([
     person(mary,25,female),
     person(frank,40,male),
