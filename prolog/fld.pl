@@ -125,7 +125,12 @@ user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     must_be(atom, Name),
     must_be(list, Flds),
     
-    fld_object_def(Name, Flds) -> Preds = []
+    (fld_object_def(Name, Fd), dif(Fd, Flds)) ->
+        format(atom(Error), 'redefining fld template ~p with fields ~p', [Name, Flds]),
+        throw(error(type_error(fld_object/2, Error)))
+    ;
+    fld_object_def(Name, Flds) -> 
+        Preds = []
     ;
     length(Flds, Len),
     generate_flds(Flds, Name, Len, 0, Getters, Setters),
