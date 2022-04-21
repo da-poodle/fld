@@ -28,19 +28,8 @@ SOFTWARE.
 :- module(fld, [
     (fld_object)/2,
     (fld)/1,
-    (fld)/2,
-    (fld_set)/3,
-    (flds)/1,
-    (flds)/2,
-    flds_set/3,
-    fld_template/2,
-    fld_fields/2,
-    op(900, fx, user:fld),
-    op(900, fx, user:flds)
+    op(900, fx, user:fld)
 ]).
-
-%:- op(900, fx, user:fld).
-%:- op(900, fx, user:flds).
 
 %! fld_object(++Name:atom, ++Fields:list) is det.
 % fields is a list of all fields that relate to object of name.
@@ -54,14 +43,63 @@ fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
 :- multifile(fld_object_def/2).
 
-%! fld(?Field:term, ?Object:term) is det.
-% Field is a argument in an object.
-:- multifile(/(fld,1)).
-:- multifile(/(fld,2)).
+% expand the directives for the the fld_object.
+user:term_expansion((:- fld_object(Name, Flds)), (fld):fld_object_def(Name, Flds)) :-
+    must_be(atom, Name),
+    must_be(list(atom), Flds).
 
-%! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
-% New is the old term with field updated.
-:- multifile(fld_set/3).
+fld(_) :- throw(error(syntax_error('fld goals are in the form: "fld A:{Type(s)}" or "fld B:{Type(s)}]-A"'))).
+
+
+% for the single named fld operation, need to know what type is being referenced
+%
+% fld _:<atom> is a template
+% fld _:[...] is a flds reference
+% fld _:<compound> is a flds reference (single field)
+% fld _:[...]-_ is a set of a list of fields
+% fld _:<compound>-_ is a set of a single field
+% default will loop over all types
+%
+fld_typeof(T, Obj, Typed) :-
+    var(T) -> throw(error(type_error([atom,list,compound],'fld types must be ground "fld _:<Type>".')))
+    ;
+    T = SetRule-In -> (
+        fld_typeof(SetRule, Obj, flds(SetFlds, Obj)),
+        Typed = flds_set(SetFlds, In, Obj)
+    )
+    ;
+    atom(T) -> Typed = template(T, Obj)
+    ; 
+    is_list(T) -> Typed = flds(T, Obj)
+    ;
+    compound(T), 
+    Typed = flds([T], Obj).
+
+% Obj = the resulting object
+% T = the type that is being expanded
+% Expanded = the expanded term
+expand_fld(Obj, T, Expanded) :-
+    fld_typeof(T, Obj, Typed),
+    fld_expand_type(Typed, Expanded).
+
+% expand the template type
+fld_expand_type(template(T, Obj), (Obj = Mapped)) :-
+    fld_template(T, Mapped).
+
+% expand the flds type
+fld_expand_type(flds(T, Obj), (Obj = Mapped)) :-
+    expand_flds(T, Mapped).
+
+% expand the flds_set type
+fld_expand_type(flds_set(FldArgs, ObjIn, ObjOut), Mapped) :-
+    expand_fld_set(ObjIn, ObjOut, FldArgs, Mapped).
+
+% expand the general type
+fld_expand_type(fld_type(T, Obj), (Obj = T)) :-
+    fld_template(T, _)
+    ; 
+    fld_template(_, Flds),
+    member(T, Flds).
 
 /* 
     FLD_TEMPLATE 
@@ -75,97 +113,10 @@ fld_template(Name, Template) :-
     length(TemplateFlds, Len),
     Template =.. [Name|TemplateFlds].
 
+
 /* 
-    FLD_OBJECT 
+    Map Getters to Flds
 */
-
-/* Generate fld_object_def/2, fld/2 and fld_set/3 predicates */
-generate_flds([], _, _, _, [], []).
-generate_flds([F|T], Name, Len, N, [Getter,Getter2|MoreGetters],[Setter|MoreSetters]) :-
-
-    % the field that will be the first argument
-    Fld =.. [F, X],
-
-    % the getter
-    obj(Name, Len, Obj, Flds),
-    fld_arg(X, Flds, N),
-    Getter = (fld):(fld Obj:Fld),
-    Getter2 = (fld):(fld(Fld, Obj)),
-
-    % the setter
-    obj(Name, Len, SetObj, SetObjFlds),
-    obj(Name, Len, NewObj, NewObjFlds),
-    fld_set_arg(X, SetObjFlds, NewObjFlds, N),
-    Setter = (fld):fld_set(Fld, SetObj, NewObj),
-
-    % next field uses the next argument
-    N1 is N + 1,
-    generate_flds(T, Name, Len, N1, MoreGetters, MoreSetters).
-
-
-% helper to generate blank objects
-obj(Name, Len, Obj, Flds) :-
-    length(Flds, Len),
-    Obj =.. [Name|Flds].
-
-% generate the second argument of the getter
-fld_arg(Val, [Val|_], 0).
-fld_arg(Val, [_|T], N) :-
-    dif(N,0),
-    N1 is N - 1,
-    fld_arg(Val, T, N1).
-
-% generate the second and third arguments of the setter
-fld_set_arg(_, [], [], _).
-fld_set_arg(Val, [F|T], [F|Nt], N) :-
-    dif(N,0),
-    N1 is N - 1,
-    fld_set_arg(Val, T, Nt, N1).
-fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
-    fld_set_arg(Val, T, Nt, -1).
-
-% expand the directives for the the fld_object.
-user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
-    must_be(atom, Name),
-    must_be(list, Flds),
-    
-    fld_object_def(Name, Flds) -> Preds = []
-    ;
-    length(Flds, Len),
-    generate_flds(Flds, Name, Len, 0, Getters, Setters),
-    append(Getters, Setters, Result),
-    Preds = [(fld):fld_object_def(Name, Flds)|Result],
-    !.
-
-
-/*
-    FLD_FIELDS/2.
-*/
-%! fld_feilds(?Object:term, ?Fields:list) is semidet.
-% return a list of all fields for object as terms instead of atoms.
-fld_fields(Obj, Fields) :-
-    Obj =.. [Name|Vals],
-    fld_object_def(Name, Flds),
-
-    maplist(fld_field_object,Flds,Vals,Fields).
-
-fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
-
-
-
-/*
-    FLDS/2.
-*/
-
-%! flds(?Fields:list, ?Object:term) is nondet.
-% Fields are a list of values that all exist in object.
-flds([], _).
-flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
-
-%! flds(?Object:term:?Fields:list) is nondet.
-% Fields are a list of values that all exist in object.
-flds(Obj:Flds) :- flds(Flds, Obj).
-
 map_getter_fields_to_value(FldObject, FldNames, FldValues, Template) :-
     fld_object_def(FldObject, Flds),
 
@@ -187,9 +138,6 @@ split_fld_args(FldArg, FldName, FldValue) :-
     FldArg =.. [FldName, FldValue].
 
 expand_flds(FldArgs, Result) :-
-    % TODO - check for type using var/nonvar check
-    is_list(FldArgs),
-
     % create a list of the fields that are being accessed
     maplist(split_fld_args, FldArgs, FldNames, FldValues),
 
@@ -199,24 +147,25 @@ expand_flds(FldArgs, Result) :-
 
     map_getter_fields_to_value(FldObject, FldNames, FldValues, Result).
 
-% Map a list of fields directly to an object so that a single operation is required
-% to access all the fields
-user:goal_expansion(flds(FldArgs, Object), (Object = Result)) :-
-    expand_flds(FldArgs, Result).
-
-user:goal_expansion(flds(Object:FldArgs), (Object = Result)) :-
-    expand_flds(FldArgs, Result).
-
 /*
-    FLDS_SET/3.
+    Map Setters to Flds
 */
 
-%! flds_set(?Fields:list, ?Old:term, ?New:term) is nondet.
-% new is the old term with all of fields updated.
-flds_set([], O, O).
-flds_set([F|T], Obj, Newer) :-
-    fld_set(F, Obj, New),
-    flds_set(T, New, Newer).
+% ObjIn = the original object
+% ObjOut = the set object
+% T = the type that is being expanded
+expand_fld_set(ObjIn, ObjOut, FldArgs, (ObjIn = In, ObjOut = Out)) :-
+
+    % create a list of the fields that are being accessed
+    maplist(split_fld_args, FldArgs, FldNames, FldValues),
+
+    % find ALL objects that have the set of fields
+    % only sets that have one fld_object can be processed.
+    findall(Name, (fld_object_def(Name, Flds), subset(FldNames, Flds)), [FldObject]),
+
+    % create the objects
+    map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out).
+
 
 map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out) :-
     fld_object_def(FldObject, Flds),
@@ -236,14 +185,5 @@ value_set_to_fld(FldNames, FldValues, Fld, Setter, NewSetter) :-
 
 % Map a list of fields directly to an object so that a single operation is required
 % to access all the fields
-user:goal_expansion(flds_set(FldArgs, ObjIn, ObjOut), (ObjIn = In, ObjOut = Out)) :-
-    is_list(FldArgs),
-
-    % create a list of the fields that are being accessed
-    maplist(split_fld_args, FldArgs, FldNames, FldValues),
-
-    % find ALL objects that have the set of fields
-    % only sets that have one fld_object can be processed.
-    findall(Name, (fld_object_def(Name, Flds), subset(FldNames, Flds)), [FldObject]),
-
-    map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out).
+user:goal_expansion((fld Obj:FldArgs), Result) :-
+    expand_fld(Obj, FldArgs, Result).
