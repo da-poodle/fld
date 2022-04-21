@@ -48,7 +48,9 @@ user:term_expansion((:- fld_object(Name, Flds)), (fld):fld_object_def(Name, Flds
     must_be(atom, Name),
     must_be(list(atom), Flds).
 
-fld(_) :- throw(error(syntax_error('fld goals are in the form: "fld A:{Type(s)}" or "fld B:{Type(s)}]-A"'))).
+fld(G) :- 
+    format(atom(Error), 'Invalid fld goal ~p', G),
+    throw(error(syntax_error(Error))).
 
 
 % for the single named fld operation, need to know what type is being referenced
@@ -84,7 +86,8 @@ expand_fld(Obj, T, Expanded) :-
 
 % expand the template type
 fld_expand_type(template(T, Obj), (Obj = Mapped)) :-
-    fld_template(T, Mapped).
+    fld_template(T, Mapped) -> true
+    ; throw(error(existence_error('fld: template does not exist', T))).
 
 % expand the flds type
 fld_expand_type(flds(T, Obj), (Obj = Mapped)) :-
@@ -93,13 +96,6 @@ fld_expand_type(flds(T, Obj), (Obj = Mapped)) :-
 % expand the flds_set type
 fld_expand_type(flds_set(FldArgs, ObjIn, ObjOut), Mapped) :-
     expand_fld_set(ObjIn, ObjOut, FldArgs, Mapped).
-
-% expand the general type
-fld_expand_type(fld_type(T, Obj), (Obj = T)) :-
-    fld_template(T, _)
-    ; 
-    fld_template(_, Flds),
-    member(T, Flds).
 
 /* 
     FLD_TEMPLATE 
