@@ -23,57 +23,79 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 @author Neil Hoskins
-@licence MIT
-*/
-:- module(fld, [
-    (fld_object)/2,
-    (fld)/1,
-    op(900, fx, user:fld),
-    
-    % legacy
-    (fld)/2,
-    fld_set/3,
-    flds/2,
-    flds_set/3,
-    fld_template/2,
-    fld_fields/2
-]).
 
-%! fld_object(++Name:atom, ++Fields:list) is det.
-% fields is a list of all fields that relate to object of name.
-% this item will be created at compliation time and will generate the following:
-% - fld/2 for each field in Fields.
-% - fld_set/3 for each field in fields.
+@license MIT
+*/
+:- module(fld,[
+              (fld_object)/2,
+              (fld)/1,
+              op(900, fx, user:fld),
+              (fld)/2,
+              fld_set/3,
+              flds/2,
+              flds_set/3,
+              fld_template/2,
+              fld_fields/2
+          ]).
+
+%! fld_object(+Name:atom, +Fields:list) is det.
+% If this term is used as a directive, then a new fld_object_def is created.
+% In this case, Name is the name of the template that will be created, and
+% Fields is the list of field names that can be used for that template.
+% The fld_object_def/2 is created at compile time along with fld/2 and fld_set/3 terms
+% for each fields in Feilds.
 %
-% After compilation, calling fld_object will return the list of fields for a previously
-% defined object.
+% Usage:
+%==
+% :- fld_object(person, [name,age,gender]).
+%==
+%
+% If this term is used as a goal, then Name will match with an existing fld_object type,
+% and Fields with the fields that were defined.
+%
+% Usage:
+%==
+% ?- fld_object(person, Fields).
+% Fields = [name,age,gender].
+%==
 fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
-:- multifile(fld_object_def/2).
+:- multifile fld_object_def/2. 
+    
+%! fld(?Spec:compound, ?Object:term) is semidet.
+% Spec is a value that exists as an argument in Object.
+% Object must be a valid fld_object type.
+%
+% Replaced by `fld Object:Spec.`
+%
+% @see fld/1.
+:- multifile (fld)/2. 
 
-%! fld(?Field:term, ?Object:term) is det.
-% Field is a argument in an object.
-:- multifile((fld)/2).
+%! fld_set(?Spec:compound, In:term, Out:term) is semidet.
+% Out is the same term as In but with the Spec value replaced.
+% In and Out must be the same term type, and the type must be
+% an fld_object type.
+%
+% Replaced by `fld Out:Spec-In.`
+%
+% @see fld/1
+:- multifile fld_set/3.
 
-%! fld_set(?Field:term, ?Old:term, ?New:term) is nondet.
-% New is the old term with field updated.
-%:- dynamic(fld_set/3).
-:- multifile(fld_set/3).
-
-/* 
-    FLD_TEMPLATE 
-*/
-
-%! fld_template(?Name:atom, ?Template:list) is nondet.
-% template is an object with all fields as uninstaniated variables.
+%! fld_template(?Name:atom, ?Template:compound) is semidet.
+% Template is a blank term created from the fld_object spec for Name.
+% This predicate can be used to get all templates or match on a spec.
+%
+% Alternative to `fld Template:Name`, fld/1 matches a single template only.
+%
+% @see fld/1
 fld_template(Name, Template) :-
     fld_object_def(Name, Flds),
     length(Flds, Len),
     length(TemplateFlds, Len),
     Template =.. [Name|TemplateFlds].
 
-/* 
-    FLD_OBJECT 
+/*
+    FLD_OBJECT
 */
 
 /* Generate fld_object_def/2, fld/2 and fld_set/3 predicates */
@@ -124,12 +146,12 @@ fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
 user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     must_be(atom, Name),
     must_be(list, Flds),
-    
+
     (fld_object_def(Name, Fd), dif(Fd, Flds)) ->
         format(atom(Error), 'redefining fld template ~p with fields ~p', [Name, Flds]),
         throw(error(type_error(fld_object/2, Error)))
     ;
-    fld_object_def(Name, Flds) -> 
+    fld_object_def(Name, Flds) ->
         Preds = []
     ;
     length(Flds, Len),
@@ -138,12 +160,15 @@ user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     Preds = [(fld):fld_object_def(Name, Flds)|Result],
     !.
 
-
-/*
-    FLD_FIELDS/2.
-*/
-%! fld_feilds(?Object:term, ?Fields:list) is semidet.
+%! fld_fields(?Object:term, ?Fields:list) is semidet.
 % return a list of all fields for object as terms instead of atoms.
+%
+% Usage:
+%==
+% ?- fld_fields(person(fred,32,male), Fields).
+% Fields = [name(fred),age(32),gender(male)].
+%==
+%
 fld_fields(Obj, Fields) :-
     Obj =.. [Name|Vals],
     fld_object_def(Name, Flds),
@@ -152,44 +177,127 @@ fld_fields(Obj, Fields) :-
 
 fld_field_object(FldName,Value,Field) :- Field =.. [FldName,Value].
 
-
-/*
-    FLDS/2.
-*/
-
-%! flds(?Fields:list, ?Object:term) is nondet.
-% Fields are a list of values that all exist in object.
+%! flds(?Spec:list(compound), ?Object:term) is semidet.
+% Object is an fld_object type, and all items in Spec must unify
+% with the coresponding arguments in Object based on the fld_object spec.
+%
+% This predicate can operate over multiple fld_object types for the same spec.
+%
+% Replaced by `fld Object:Spec.`
+%
+% @see fld/1
 flds([], _).
 flds([F|T], Obj) :-  fld(F, Obj), flds(T, Obj).
 
-
-/*
-    FLDS_SET/3.
-*/
-
-%! flds_set(?Fields:list, ?Old:term, ?New:term) is nondet.
-% new is the old term with all of fields updated.
+%! flds_set(?Spec:list(compound/1), ?In:term, ?Out:term) is semidet.
+% Out is the same type as In but with fields in Spec replaced, according to
+% the fld_object template spec.
+%
+% This predicate can operate over multiple fld_object types.
+%
+% Replaced by `fld Out:Spec-In.`
+%
+% @see fld/1
 flds_set([], O, O).
 flds_set([F|T], Obj, Newer) :-
     fld_set(F, Obj, New),
     flds_set(T, New, Newer).
 
-/*
-    FLD/1
-*/
-
-fld(G) :- 
+%! fld(Spec) is det.
+% Spec varies, see below.
+% 
+% fld/1 is an expanded term in which Spec has a different function according to the values provided. 
+% The following is possible:
+% - check fld type
+% - extract value(s) from fld type
+% - replace value(s) in fld type
+%
+% The examples use ``:- fld_object(t,[a,b,c]).`` as an example type specification.
+%
+%---
+% *Templates, Type Checking*
+%==
+% fld T:t.
+%==
+% T is a template of the spec for type t. This can be used to either create a blank term or type t
+% or check the a variable is of type t.
+% Expands to 
+%==
+% T = t(_,_,_).
+%==
+%
+%---
+% *Get Single Value*
+%==
+% fld T:a(A).
+%==
+% Unify A with the a argument in T.
+%
+% If  is unique to the type t, then expansion will be:
+%==
+%T = t(A,_,_).
+%==
+%
+% If a is not unque to type t, then expansion will be:
+%==
+% fld([a(A)],T).
+%==
+%
+%---
+% *Get Multiple Values*
+%==
+% fld T:[a(A),b(B)].
+%==
+% Unify A and B with the a,b arguments in T.
+%
+% If the A,B combination is unique to the type t, then expansion will be:
+%==
+%T = t(A,B,_).
+%==
+%
+% If the combination is not unque to type t, then expansion will be:
+%==
+% fld([a(A),b(B)],T).
+%==
+%
+%---
+% *Set Single Value*
+%==
+% fld T1:a(A)-T.
+%==
+% Unify A with the value of the a argument in T1, T is T1 without A.
+% This is used for replacing fields from T in T1.
+%
+% If A is unique to type t, then expand to
+%==
+% T = t(_,B,C), T1 = (X,B,C).
+%==
+% Otherwise expand to
+%==
+% flds_set([c(X)], T, T1).
+%==
+%
+%---
+% *Set Multiple Values*
+%==
+% fld T1:[a(A),b(B)]-T.
+%==
+% Unify A,B with the value of the a,b arguments in T1, T is T1 without A,B.
+% This is used for replacing fields from T in T1.
+%
+% If the a,b combination is unique to type t, then expand to
+%==
+% T = t(_,_,C), T1 = (A,B,C).
+%==
+% Otherwise expand to
+%==
+% flds_set([a(A),b(B)], T, T1).
+%==
+%
+fld(G) :-
     format(atom(Error), 'Invalid fld goal ~p', G),
     throw(error(syntax_error(Error))).
 
-% for the single named fld operation, need to know what type is being referenced
-%
-% fld _:<atom> is a template
-% fld _:[...] is a flds reference
-% fld _:<compound> is a flds reference (single field)
-% fld _:[...]-_ is a set of a list of fields
-% fld _:<compound>-_ is a set of a single field
-% default will loop over all types
 %
 fld_typeof(T, Obj, Typed) :-
     var(T) -> throw(error(type_error([atom,list,compound],'fld types must be ground "fld _:<Type>".')))
@@ -200,10 +308,10 @@ fld_typeof(T, Obj, Typed) :-
     )
     ;
     atom(T) -> Typed = template(T, Obj)
-    ; 
+    ;
     is_list(T) -> Typed = flds(T, Obj)
     ;
-    compound(T), 
+    compound(T),
     Typed = flds([T], Obj).
 
 % Obj = the resulting object
@@ -234,7 +342,7 @@ split_fld_args(FldArg, FldName, FldValue) :-
     FldArg =.. [FldName, FldValue].
 
 
-/* 
+/*
     Map Getters to Flds
 */
 expand_flds(FldArgs, Obj, Result) :-
@@ -259,12 +367,12 @@ map_get_fields([_,_|_], Obj, FldNames, FldValues, flds(FldArgs, Obj)) :-
     maplist(split_fld_args, FldArgs, FldNames, FldValues).
 
 
-% expand out a a template to an object and map the desired get fields to 
+% expand out a a template to an object and map the desired get fields to
 % the same fields in the template
 map_getter_fields_to_value(FldObject, FldNames, FldValues, Template) :-
     fld_object_def(FldObject, Flds),
 
-    % create a list of variables to substitute for the flds, 
+    % create a list of variables to substitute for the flds,
     % we don't know the order of the values yet
     maplist(value_to_fld(FldNames, FldValues), Flds, GetValues),
 
@@ -273,7 +381,7 @@ map_getter_fields_to_value(FldObject, FldNames, FldValues, Template) :-
 
 % set the value on an argument in the template object
 value_to_fld(FldNames, FldValues, Fld, Value) :-
-    memberchk(Fld, FldNames) -> 
+    memberchk(Fld, FldNames) ->
         nth0(Idx, FldNames, Fld),
         nth0(Idx, FldValues, Value)
     ;
@@ -310,7 +418,7 @@ map_set_fields([FldObject], ObjIn, ObjOut, FldNames, FldValues, (ObjIn = In, Obj
 map_set_fields([_,_|_], ObjIn, ObjOut, FldNames, FldValues, flds_set(FldArgs, ObjIn, ObjOut)) :-
     maplist(split_fld_args, FldArgs, FldNames, FldValues).
 
-% map the in and out terms, need two terms here. 
+% map the in and out terms, need two terms here.
 % The In term defines all the fields that are not being set
 % The Out term defines all the feilds and maps the set ones.
 map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out) :-
@@ -324,7 +432,7 @@ map_setter_fields_to_value(FldObject, FldNames, FldValues, In, Out) :-
 
 
 value_set_to_fld(FldNames, FldValues, Fld, Setter, NewSetter) :-
-    memberchk(Fld, FldNames) -> 
+    memberchk(Fld, FldNames) ->
         nth0(Idx, FldNames, Fld),
         nth0(Idx, FldValues, NewSetter)
     ;
