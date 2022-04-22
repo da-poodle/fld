@@ -29,7 +29,7 @@ To create a blank term, use the ``fld_template/2``.
 P = person(_111, _112, _113).
 ```
 
-To set a field, use ``fld_set/3``, to set multiple fields use ``flds_set/3``.
+To set fields:
 
 ```prolog
 ?- fld P1:name('Fred')-$P.
@@ -39,7 +39,7 @@ P1 = person('Fred', _112, _113).
 P2 = person('Fred', 32, male). 
 ```
 
-To get the current value of a field, use ``fld/2``, to get multiple fields use ``flds/2``.
+To get the current values of fields:
 
 ```prolog
 ?- fld $P2:name(Name).
