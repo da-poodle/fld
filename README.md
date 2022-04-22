@@ -25,27 +25,27 @@ This will create accessors for a ``person/3`` term.
 
 To create a blank term, use the ``fld_template/2``.
 ```prolog
-?- fld_template(person, P).
+?- fld P:person.
 P = person(_111, _112, _113).
 ```
 
 To set a field, use ``fld_set/3``, to set multiple fields use ``flds_set/3``.
 
 ```prolog
-?- fld_set(name('Fred'), $P, P1).
+?- fld P1:name('Fred')-$P.
 P1 = person('Fred', _112, _113).
 
-?- flds_set([age(32), gender(male)], $P1, P2).
+?- fld P2:[age(32), gender(male)]-$P1.
 P2 = person('Fred', 32, male). 
 ```
 
 To get the current value of a field, use ``fld/2``, to get multiple fields use ``flds/2``.
 
 ```prolog
-?- fld(name(Name), $P2).
+?- fld $P2:name(Name).
 Name = 'Fred'.
 
-?- flds([name(Name), age(Age)], $P2).
+?- fld $P2:[name(Name), age(Age)].
 Name = 'Fred,
 Age = 32.
 ```
@@ -71,6 +71,93 @@ Attempting to call fld_object/2 with a name and different parameters fails. eg:
 ```prolog
 ?- fld_object(person, [name,age,sex]).
 false.
+```
+
+## fld/1
+
+``fld/1`` is an expanded term in which Spec has a different function according to the values provided. 
+The following is possible:
+ - check fld type
+ - extract value(s) from fld type
+ - replace value(s) in fld type
+
+The examples use ``:- fld_object(t,[a,b,c]).`` as an example type specification.
+
+---
+*Templates, Type Checking*
+
+```prolog
+fld T:t.
+```
+
+T is a template of the spec for type t. This can be used to either create a blank term or type t
+or check the a variable is of type t.
+
+Expands to 
+```prolog
+T = t(_,_,_).
+```
+---
+*Get Single Value*
+```prolog
+fld T:a(A).
+```
+Unify A with the a argument in type T.
+
+If  is unique to the type t, then expansion will be:
+```prolog
+T = t(A,_,_).
+```
+If a is not unque to type t, then expansion will be:
+```prolog
+flds([a(A)],T).
+```
+---
+*Get Multiple Values*
+```prolog
+fld T:[a(A),b(B)].
+```
+Unify A and B with the a,b arguments in type T.
+
+If the A,B combination is unique to the type t, then expansion will be:
+```prolog
+T = t(A,B,_).
+```
+If the combination is not unque to type t, then expansion will be:
+```prolog
+flds([a(A),b(B)],T).
+```
+---
+*Set Single Value*
+```prolog
+fld T1:a(A)-T.
+```
+Unify A with the value of the a argument in T1, T is T1 without A.
+This is used for replacing fields from T in T1.
+
+If A is unique to type t, then expand to
+```prolog
+T = t(_,B,C), T1 = (X,B,C).
+```
+Otherwise expand to
+```prolog
+flds_set([c(X)], T, T1).
+```
+
+*Set Multiple Values*
+```prolog
+fld T1:[a(A),b(B)]-T.
+```
+Unify A,B with the value of the a,b arguments in T1, T is T1 without A,B.
+This is used for replacing fields from T in T1.
+
+If the a,b combination is unique to type t, then expand to
+```prolog
+T = t(_,_,C), T1 = (A,B,C).
+```
+Otherwise expand to
+```prolog
+flds_set([a(A),b(B)], T, T1).
 ```
 
 ## fld/2
@@ -193,7 +280,7 @@ read_bank_records(Data) :-
   csv_read_file('bank_records.csv', Data, [functor(transaction), arity(5)]).
 
 % create a filter that can get the records over $1000
-over_one_thousand(Tran) :- fld(amount(Amount), Tran), Amount > 1000.
+over_one_thousand(Tran) :- fld Tran:amount(Amount), Amount > 1000.
 
 % load and filter the data
 load_and_filter :-
@@ -202,7 +289,7 @@ load_and_filter :-
     maplist(print_record, ExpensiveRecords).
 
 print_record(Tran) :-
-    flds([date(Date), description(Desc), amount(Amount)], Tran),
+    fld Tran:[date(Date), description(Desc), amount(Amount)],
     format('~w $~w - ~w~n', [Date, Amount, Desc]).
 ```
 
@@ -215,19 +302,18 @@ It is possible to use multiple object types in the same code if they share field
 :- fld_object(bus, [company, model, registration, expires, year_of_make]).
 
 registration_valid(RoadUser) :-
-  flds([registration(Rego), expires(Expires)], RoadUser),
+  fld RoadUser:[registration(Rego), expires(Expires)],
   get_time(Time),
   (   Time < Expires -> true
   ; format('Rego ~p is expired~n', Rego)).
 
-
 test :-
-    fld_template(car, C),
-    flds([registration('ABC-123'), expires(1544947900.570324)], C),
+    fld C:car,
+    fld C:[registration('ABC-123'), expires(1544947900.570324)],
     registration_valid(C).
 
 test :-
-    fld_template(bus, B),
-    flds([registration('DA-BUS01'), expires(1544947900.570324)], B),
+    fld B:bus,
+    fld B:[registration('DA-BUS01'), expires(1544947900.570324)],
     registration_valid(B).
 ```
