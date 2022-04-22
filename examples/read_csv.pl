@@ -10,7 +10,7 @@ read_bank_records(Data) :-
   csv_read_file('bank_records.csv', Data, [functor(transaction), arity(5)]).
 
 % create a filter that can get the records over $1000
-over_one_thousand(Tran) :- fld(amount(Amount), Tran), Amount > 1000.
+over_one_thousand(Tran) :- fld Tran:amount(Amount), Amount > 1000.
 
 % load and filter the data
 load_and_filter :-
@@ -19,5 +19,5 @@ load_and_filter :-
     maplist(print_record, ExpensiveRecords).
 
 print_record(Tran) :-
-    flds([date(Date), description(Desc), amount(Amount)], Tran),
+    fld Tran:[date(Date), description(Desc), amount(Amount)],
     format('~w $~w - ~w~n', [Date, Amount, Desc]).
