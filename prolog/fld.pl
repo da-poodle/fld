@@ -60,8 +60,8 @@ SOFTWARE.
 %==
 fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 
-:- multifile fld_object_def/2. 
-    
+:- multifile fld_object_def/2.
+
 %! fld(?Spec:compound, ?Object:term) is semidet.
 % Spec is a value that exists as an argument in Object.
 % Object must be a valid fld_object type.
@@ -69,7 +69,7 @@ fld_object(Name, Fields) :- fld_object_def(Name, Fields).
 % Replaced by `fld Object:Spec.`
 %
 % @see fld/1.
-:- multifile (fld)/2. 
+:- multifile (fld)/2.
 
 %! fld_set(?Spec:compound, In:term, Out:term) is semidet.
 % Out is the same term as In but with the Spec value replaced.
@@ -142,22 +142,48 @@ fld_set_arg(Val, [F|T], [F|Nt], N) :-
 fld_set_arg(Val, [_|T], [Val|Nt], 0) :-
     fld_set_arg(Val, T, Nt, -1).
 
+% expand fields so that extended objects are included.
+expand_field_list([]) --> [].
+% *(Obj) will add the fields from an existing object to this object
+expand_field_list([*(Obj)|T]) --> extend_field_list(Obj), expand_field_list(T), !.
+% default is to add the field
+expand_field_list([F|T]) --> { atom(F) }, [F], expand_field_list(T).
+
+% expand out an inheritance, get the list of fields and call expand on that list
+extend_field_list(Obj) --> {
+        fld_object_def(Obj, ObjFields) -> true
+        ;
+        '$existence_error'(fld_object, Obj)
+    },
+    expand_field_list(ObjFields).
+
+
 % expand the directives for the the fld_object.
 user:term_expansion((:- fld_object(Name, Flds)), Preds) :-
     must_be(atom, Name),
     must_be(list, Flds),
 
-    (fld_object_def(Name, Fd), dif(Fd, Flds)) ->
-        format(atom(Error), 'redefining fld template ~p with fields ~p', [Name, Flds]),
-        throw(error(type_error(fld_object/2, Error)))
-    ;
-    fld_object_def(Name, Flds) ->
-        Preds = []
-    ;
-    length(Flds, Len),
-    generate_flds(Flds, Name, Len, 0, Getters, Setters),
-    append(Getters, Setters, Result),
-    Preds = [(fld):fld_object_def(Name, Flds)|Result],
+    (
+        ground(Flds) -> true;
+        '$domain_error'('fld list of ONLY ground values', fld_object(Name, Flds))
+    ),
+
+    phrase(expand_field_list(Flds), FldList, []),
+    list_to_set(FldList, UniqueFields),
+
+    (
+        (fld_object_def(Name, Fd), dif(Fd, UniqueFields)) ->
+            format(atom(Error), '~p which redefines ~p', [fld_object(Name, Flds), fld_object(Name, Fd)]),
+            '$domain_error'('unique fld', Error)
+        ;
+        fld_object_def(Name, UniqueFields) ->
+            Preds = []
+        ;
+        length(UniqueFields, Len),
+        generate_flds(UniqueFields, Name, Len, 0, Getters, Setters),
+        append(Getters, Setters, Result),
+        Preds = [(fld):fld_object_def(Name, UniqueFields)|Result]
+    ),
     !.
 
 %! fld_fields(?Object:term, ?Fields:list) is semidet.
@@ -205,8 +231,8 @@ flds_set([F|T], Obj, Newer) :-
 
 %! fld(Spec) is det.
 % Spec varies, see below.
-% 
-% fld/1 is an expanded term in which Spec has a different function according to the values provided. 
+%
+% fld/1 is an expanded term in which Spec has a different function according to the values provided.
 % The following is possible:
 % - check fld type
 % - extract value(s) from fld type
@@ -221,7 +247,7 @@ flds_set([F|T], Obj, Newer) :-
 %==
 % T is a template of the spec for type t. This can be used to either create a blank term or type t
 % or check the a variable is of type t.
-% Expands to 
+% Expands to
 %==
 % T = t(_,_,_).
 %==
@@ -295,12 +321,11 @@ flds_set([F|T], Obj, Newer) :-
 %==
 %
 fld(G) :-
-    format(atom(Error), 'Invalid fld goal ~p', G),
-    throw(error(syntax_error(Error))).
+    throw(syntax_error(G, 'fld/1 must be in the form "fld Dest:template", "fld Dest:<getter(s)>" or "fld Dest:<setter(s)>-Src".')).
 
 %
 fld_typeof(T, Obj, Typed) :-
-    var(T) -> throw(error(type_error([atom,list,compound],'fld types must be ground "fld _:<Type>".')))
+    var(T) -> '$type_error'(atom, T)
     ;
     T = SetRule-In -> (
         fld_typeof(SetRule, Obj, flds(SetFlds, Obj)),
@@ -324,7 +349,7 @@ expand_fld(Obj, T, Expanded) :-
 % expand the template type
 fld_expand_type(template(T, Obj), (Obj = Mapped)) :-
     fld_template(T, Mapped) -> true
-    ; throw(error(existence_error('fld: template does not exist', T))).
+    ; '$existence_error'('fld template', T).
 
 % expand the flds type
 fld_expand_type(flds(T, Obj), Mapped) :-
